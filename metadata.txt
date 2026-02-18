@@ -1,0 +1,12 @@
+[general]
+name=R Console
+description=R console into QGIS 
+about=R console into QGIS 
+version=1.0
+icon=Rlogo.png
+qgisMinimumVersion=3.0
+author=Juan Mendozap
+email=jsmendozap@gmail.com
+license=GPL
+repository=URL to the code repository
+supportsQt6=True
