@@ -1,5 +1,5 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal, QEvent, QSize
-from qgis.PyQt.QtGui import QIcon, QFont, QTextCursor, QKeySequence, QColor
+from qgis.PyQt.QtGui import QIcon, QFont, QKeySequence, QColor
 from qgis.PyQt.Qsci import QsciScintilla, QsciLexerPython
 import html
 
@@ -23,8 +23,54 @@ from qgis.PyQt.QtWidgets import (
     QLineEdit,
     QShortcut,
     QFileDialog,
+    QTabBar,
+    QMessageBox,
 )
 
+class EditorTab(QsciScintilla):
+    dirtyChanged = pyqtSignal(bool)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setUtf8(True)
+        self._is_dirty = True
+        self.file_path = None
+        self._configure_editor()
+        self.textChanged.connect(self.mark_dirty)
+
+    def _configure_editor(self):
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.TypeWriter)
+        self.setFont(font)
+        self.setMarginsFont(font)
+
+        self.setMarginType(0, QsciScintilla.NumberMargin)
+        self.setMarginWidth(0, "00")
+        self.setMarginLineNumbers(0, True)
+        self.setMarginsForegroundColor(Qt.gray)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setBraceMatching(QsciScintilla.SloppyBraceMatch)
+        self.setAutoIndent(True)
+
+        if QsciLexerR is not None:
+            self.setLexer(QsciLexerR(self))
+        else:
+            self.setLexer(QsciLexerPython(self))
+
+    def mark_saved(self, path):
+        self.file_path = path
+        if self._is_dirty:
+            self._is_dirty = False
+            self.dirtyChanged.emit(False)
+
+    def mark_dirty(self):
+        if not self._is_dirty:
+            self._is_dirty = True
+            self.dirtyChanged.emit(True)
+
+    def name(self):
+        base = self.file_path.split("/")[-1] if self.file_path else "Untitled.R"
+        return f"*{base}" if self._is_dirty else base
 
 
 class RConsoleDockWidget(QDockWidget):
@@ -36,9 +82,8 @@ class RConsoleDockWidget(QDockWidget):
         super().__init__(parent)
         self._repl_history = []
         self._repl_history_index = -1
-        self._current_file_path = None
-        self._is_dirty = True
         self._shortcuts = []
+        self._handling_plus_click = False
         self._build_header()
         self._build_editor_area()
         self._build_console_area()
@@ -60,7 +105,7 @@ class RConsoleDockWidget(QDockWidget):
 
         self.save_button = QToolButton()
         self.save_button.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.save_button.setToolTip("Save")
+        self.save_button.setToolTip("Save script")
 
         self.run_button = QToolButton()
         self.run_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
@@ -77,25 +122,9 @@ class RConsoleDockWidget(QDockWidget):
     def _build_editor_area(self):
         # editor_tabs + QsciScintilla + lexer + margins
         self.editor_tabs = QTabWidget()
-        self.editor = QsciScintilla()
-        self.editor.setUtf8(True)
-        
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        self.editor.setFont(font)
-        self.editor.setMarginsFont(font)
-
-        self.editor.setMarginType(0, QsciScintilla.NumberMargin)
-        self.editor.setMarginWidth(0, "00")
-        self.editor.setMarginLineNumbers(0, True)
-        self.editor.setMarginsForegroundColor(Qt.gray)
-        self.editor.setFrameShape(QFrame.NoFrame)
-        self.editor.setBraceMatching(QsciScintilla.SloppyBraceMatch)
-        if QsciLexerR is not None:
-            self.editor.setLexer(QsciLexerR(self.editor))
-        else:
-            self.editor.setLexer(QsciLexerPython(self.editor))
-        self.editor_tabs.addTab(self.editor, "Untitled1.R")
+        self.editor_tabs.setTabsClosable(True)
+        self.editor = self._new_tab()
+        self._add_plus_tab()
 
         corner_editor = QWidget()
         corner_layout = QHBoxLayout(corner_editor)
@@ -104,6 +133,26 @@ class RConsoleDockWidget(QDockWidget):
         corner_layout.addWidget(self.run_button)
         corner_layout.addWidget(self.settings_button)
         self.editor_tabs.setCornerWidget(corner_editor, Qt.TopRightCorner)
+
+    def _new_tab(self):
+        tab = EditorTab()
+        tab.dirtyChanged.connect(lambda _dirty, editor=tab: self._update_tab_dirty_style(self.editor_tabs.indexOf(editor)))
+
+        position = self.editor_tabs.count()
+        if position > 0 and self.editor_tabs.tabText(position - 1) == "+":
+            position -= 1
+
+        idx = self.editor_tabs.insertTab(position, tab, tab.name())
+        self.editor_tabs.setCurrentIndex(idx)
+        self._update_tab_dirty_style(idx)
+        self._refresh_close_buttons()
+        return tab
+
+    def _add_plus_tab(self):
+        plus = QWidget()
+        idx = self.editor_tabs.addTab(plus, "+")
+        self.editor_tabs.tabBar().setTabTextColor(idx, QColor("#666666"))
+        self._refresh_close_buttons()
 
     def _build_console_area(self):
         # output_tabs + history + repl + console_tab/layout
@@ -219,9 +268,78 @@ class RConsoleDockWidget(QDockWidget):
         self.clear_button.clicked.connect(self._clear_console)
         self.save_button.clicked.connect(self._save_script)
         self.repl.returnPressed.connect(self._emit_repl_run)
-        self._register_shortcuts()
         self.executionStateChanged.connect(self.set_running_state)
-        self.editor.textChanged.connect(self._on_editor_changed)
+        self.editor_tabs.tabCloseRequested.connect(self._close_tab)
+        self.editor_tabs.tabBarClicked.connect(self._on_editor_tab_clicked)
+        self.editor_tabs.currentChanged.connect(lambda i: self._update_tab_dirty_style(i))
+        self._register_shortcuts()
+
+    def _on_editor_tab_clicked(self, index):
+        if index < 0:
+            return
+
+        if self.editor_tabs.tabText(index) != "+":
+            return
+    
+        if self._handling_plus_click:
+            return
+
+        self._handling_plus_click = True
+        try:
+            self.editor_tabs.removeTab(index)  
+            self._new_tab()                    
+            self._add_plus_tab()               
+            self._refresh_close_buttons()
+        finally:
+            self._handling_plus_click = False
+
+    def _close_tab(self, index):
+        if index is None:
+            index = self.editor_tabs.currentIndex()
+        if index < 0:
+            return
+        if self.editor_tabs.tabText(index) == "+":
+            return
+
+        widget = self.editor_tabs.widget(index)
+
+        if widget._is_dirty:
+            response = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                f"The script '{widget.name().lstrip('*')}' has unsaved changes. Do you want to save before closing?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                QMessageBox.Save
+            ) 
+            if response == QMessageBox.Save:
+                if not self._save_editor(widget):
+                    return
+            elif response == QMessageBox.Cancel:
+                return
+
+        self.editor_tabs.removeTab(index)
+
+        if widget is not None:
+            widget.deleteLater()
+
+        real_tabs = [i for i in range(self.editor_tabs.count()) if self.editor_tabs.tabText(i) != "+"]
+        if not real_tabs:
+            self._new_tab()
+        
+        self._refresh_close_buttons()
+
+        current = self.editor_tabs.currentIndex()
+        if current >= 0 and self.editor_tabs.tabText(current) == "+":
+            for i in range(self.editor_tabs.count()):
+                if self.editor_tabs.tabText(i) != "+":
+                    self.editor_tabs.setCurrentIndex(i)
+                    break
+
+    def _refresh_close_buttons(self):
+        tab_bar = self.editor_tabs.tabBar()
+        for i in range(self.editor_tabs.count()):
+            if self.editor_tabs.tabText(i) == "+":
+                tab_bar.setTabButton(i, QTabBar.RightSide, None)
 
     def _register_shortcuts(self):
         run_ctrl = QShortcut(QKeySequence("Ctrl+Return"), self)
@@ -235,6 +353,22 @@ class RConsoleDockWidget(QDockWidget):
         repl_shift_enter = QShortcut(QKeySequence("Shift+Return"), self.repl)
         repl_shift_enter.activated.connect(self._emit_repl_run)
         self._shortcuts.append(repl_shift_enter)
+
+        new_tab = QShortcut(QKeySequence("Ctrl+T"), self)
+        new_tab.activated.connect(self._new_tab)
+        self._shortcuts.append(new_tab)
+
+        close_tab = QShortcut(QKeySequence("Ctrl+W"), self)
+        close_tab.activated.connect(lambda: self._close_tab(self.editor_tabs.currentIndex()))
+        self._shortcuts.append(close_tab)
+
+        clear = QShortcut(QKeySequence("Ctrl+L"), self)
+        clear.activated.connect(self._clear_console)
+        self._shortcuts.append(clear)
+
+        save = QShortcut(QKeySequence("Ctrl+S"), self)
+        save.activated.connect(self._save_script)
+        self._shortcuts.append(save)
 
     def set_running_state(self, is_running):
         self.run_button.setEnabled(not is_running)
@@ -256,7 +390,14 @@ class RConsoleDockWidget(QDockWidget):
         self._update_tab_dirty_style()
         
     def _emit_run(self):
-        code = self.editor.text()
+        editor = self.editor_tabs.currentWidget()
+
+        if not isinstance(editor, EditorTab):
+            return
+
+        code = editor.text().strip()
+        if not code:
+            return
         self.runRequested.emit(code)
 
     def _emit_repl_run(self):
@@ -308,37 +449,54 @@ class RConsoleDockWidget(QDockWidget):
         self.history.clear()
 
     def _save_script(self):
-        path = self._current_file_path
+        editor = self.editor_tabs.currentWidget()
+        self._save_editor(editor)
 
+    def _save_editor(self, editor):
+        if not isinstance(editor, EditorTab):
+            return False
+
+        path = editor.file_path
         if path is None:
-            path, _ = QFileDialog.getSaveFileName(self, "Save R Script", "", "R Scripts (*.R);;All Files (*)")
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save R Script",
+                "",
+                "R Scripts (*.R);;All Files (*)",
+            )
             if not path:
-                return
-            self._current_file_path = path
+                return False  # cancelado
 
         with open(path, "w", encoding="utf-8") as f:
-            f.write(self.editor.text())
+            f.write(editor.text())
 
-        self._current_file_path = path
-        tab_name = path.split("/")[-1]
-        self.editor_tabs.setTabText(self.editor_tabs.currentIndex(), tab_name)
-        self._is_dirty = False
-        self._update_tab_dirty_style()
+        editor.mark_saved(path)
+        index = self.editor_tabs.indexOf(editor)
+        if index >= 0:
+            self._update_tab_dirty_style(index)
+        return True
 
-    def _update_tab_dirty_style(self):
-        index = self.editor_tabs.currentIndex()
+    def _update_tab_dirty_style(self, index=None):
+        if index is None:
+            index = self.editor_tabs.currentIndex()
+        if index < 0:
+            return
+
+        editor = self.editor_tabs.widget(index)
+        if editor is None:
+            return
+
         tab_bar = self.editor_tabs.tabBar()
-        if self._is_dirty:
-            tab_bar.setTabTextColor(index, QColor("#963939"))
-            tab_bar.setTabText(index, f"*{tab_bar.tabText(index).lstrip('*')}")
-        else:
-            tab_bar.setTabTextColor(0, QColor("black"))
-            tab_bar.setTabTextColor(index, QColor("black"))
+        
+        if not isinstance(editor, EditorTab):
+             return
+        
+        tab_bar.setTabText(index, editor.name())
 
-    def _on_editor_changed(self):
-        if not self._is_dirty:
-            self._is_dirty = True
-            self._update_tab_dirty_style()
+        if editor._is_dirty:
+            tab_bar.setTabTextColor(index, QColor("#963939"))
+        else:
+            tab_bar.setTabTextColor(index, QColor("black"))
 
     def append_output(self, text):
         self.history.append(text)
@@ -347,11 +505,7 @@ class RConsoleDockWidget(QDockWidget):
         self.history.append(self._render_repl_command_html(text))
 
     def append_error(self, text):
-        cursor = self.history.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.history.setTextCursor(cursor)
-        self.history.insertHtml(f"<span style='color: red;'>{text}</span><br>")
-        self.history.ensureCursorVisible()
+        self.history.append(f"<span style='color: red;'>{text}</span>")
 
     def _render_repl_command_html(self, text):
         BLUE_PROMPT = "#0E0ED0"   # > azul oscuro
