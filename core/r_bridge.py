@@ -13,6 +13,30 @@ class RBridge:
         self.r_version = self._get_r_version()
         self._set_home()
         
+    def run_code(self, code, width=None):
+        data = {"code": code}
+        if width:
+            data["width"] = int(width)
+        request = json.dumps(data) + "\n"
+
+        self.process.stdin.write(request)
+        self.process.stdin.flush()
+
+        response = self.process.stdout.readline().strip()
+        
+        if not response:
+            raise RuntimeError("R process returned empty response (process might have crashed or path is invalid).")
+            
+        return json.loads(response.strip())
+    
+    def stop(self):
+        self.process.terminate()
+
+    def restart(self):
+        self.stop()
+        self.process = self._start()
+        self.r_version = self._get_r_version()
+
     def _request_r_path(self):
 
         settings = os.path.join(self.plugin_dir, 'settings.json')
@@ -65,27 +89,6 @@ class RBridge:
             raise RuntimeError("Failed to start R worker process.")
         
         return process     
-
-    def run_code(self, code, width=None):
-        data = {"code": code}
-        if width:
-            data["width"] = int(width)
-        request = json.dumps(data) + "\n"
-
-        self.process.stdin.write(request)
-        self.process.stdin.flush()
-
-        response = self.process.stdout.readline().strip()
-            
-        return json.loads(response.strip())
-    
-    def stop(self):
-        self.process.terminate()
-
-    def restart(self):
-        self.stop()
-        self.process = self._start()
-        self.r_version = self._get_r_version()
 
     def _get_r_version(self):
         code = "cat(paste0(R.Version()$major, '.', R.Version()$minor))"

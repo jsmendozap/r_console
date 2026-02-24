@@ -2,8 +2,8 @@ from qgis.PyQt.QtWidgets import QAction
 from qgis.core import Qgis
 from qgis.PyQt.QtGui import QIcon
 from os.path import join, dirname
-from .dock_widget import RDockWidget
-from .r_bridge import RBridge
+from .ui.dock_widget import RDockWidget
+from .core.r_bridge import RBridge
 from qgis.PyQt.QtCore import Qt
 #from importlib.util import find_spec
 
@@ -58,7 +58,7 @@ class Console:
         try:
             for line in code.splitlines():
                 result = self.r_console.run_code(line, width=width)
-                self.dock.print_to_console(line, result)
+                self.dock.print(line, result)
         finally:
             self.dock.new_line()
             self.dock.executionStateChanged.emit(False)
@@ -69,7 +69,7 @@ class Console:
             
         try:
             self.r_console = RBridge(self.plugin_dir, popup = popup)
-            self.dock.set_r_version(self.r_console.r_version)
+            self.dock.set_console_header(self.r_console.r_version)
             return True
         except Exception as e:
             self.iface.messageBar().pushMessage("R Console Error", f"Failed to initialize R Console: {e}", Qgis.Warning)

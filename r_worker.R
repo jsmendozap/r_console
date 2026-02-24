@@ -45,7 +45,8 @@ while (TRUE) {
     response <- toJSON(
         list(
             stdout = paste(output, collapse = "\n"),
-            error = error_msg
+            error = error_msg, 
+            wd = getwd()
         ),
         auto_unbox = TRUE,
         null = "null"
