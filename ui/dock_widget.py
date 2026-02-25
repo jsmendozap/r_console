@@ -76,7 +76,7 @@ class RDockWidget(QDockWidget):
         self.save_button.setToolTip("Save script")
 
         self.open_button = QToolButton()
-        self.open_button.setIcon(self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.open_button.setIcon(self.style().standardIcon(QStyle.SP_FileDialogStart))
         self.open_button.setToolTip("Open script")
 
         self.run_button = QToolButton()
@@ -94,6 +94,10 @@ class RDockWidget(QDockWidget):
         self.restart_button = QToolButton()
         self.restart_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
         self.restart_button.setToolTip("Restart R")
+
+        self.wd_buttom = QToolButton()
+        self.wd_buttom.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
+        self.wd_buttom.setToolTip("Change working directory")
 
     def _build_editor_area(self):
         # editor_tabs + QsciScintilla + lexer + margins
@@ -277,6 +281,7 @@ class RDockWidget(QDockWidget):
         corner_layout.setContentsMargins(0, 0, 4, 3)
         corner_layout.addWidget(self.clear_button)
         corner_layout.addWidget(self.restart_button)
+        corner_layout.addWidget(self.wd_buttom)
         self.output_tabs.setCornerWidget(corner_console, Qt.TopRightCorner)
 
         # ---- Console tab container ----
@@ -369,13 +374,18 @@ class RDockWidget(QDockWidget):
         self.save_button.clicked.connect(self._save_editor)
         self.open_button.clicked.connect(self._open_script)
         self.restart_button.clicked.connect(self.restartRequested.emit)
+        self.wd_buttom.clicked.connect(self._on_change_wd)
         self.console.runRequested.connect(self._on_console_run)
         self.executionStateChanged.connect(self.set_running_state)
         self.editor_tabs.tabCloseRequested.connect(self._close_tab)
         self.editor_tabs.tabBarClicked.connect(self._on_editor_tab_clicked)
         self.editor_tabs.currentChanged.connect(lambda i: self._update_tab_dirty_style(i))
-        self.settings.wdChanged.connect(self._set_console_wd)
         self._register_shortcuts()
+
+    def _on_change_wd(self):
+        path = QFileDialog.getExistingDirectory(self, "Change working directory")
+        if path:
+            self._set_console_wd(path)
 
     def _set_console_wd(self, new_path, emit = True):
         path = new_path.split(os.sep)

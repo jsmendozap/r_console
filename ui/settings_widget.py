@@ -4,7 +4,6 @@ from qgis.PyQt.QtCore import QSettings, pyqtSignal
 import os
 
 class RDockSettings(QDialog):
-    wdChanged = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,11 +32,7 @@ class RDockSettings(QDialog):
         self.initial_wd = QgsFileWidget()
         self.initial_wd.setStorageMode(QgsFileWidget.GetDirectory)
 
-        self.wd = QgsFileWidget()
-        self.wd.setStorageMode(QgsFileWidget.GetDirectory)
-
         form_layout.addRow("Working directory on startup:", self.initial_wd)
-        form_layout.addRow("Working directory:", self.wd)
         form_layout.addRow("R/Rscript path:", self.r_path)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -48,7 +43,6 @@ class RDockSettings(QDialog):
     def _register_signals(self):
         self.button_box.accepted.connect(self.save_settings)
         self.button_box.rejected.connect(self.reject)
-        self.wd.fileChanged.connect(lambda path: self.wdChanged.emit(path))
 
     def _load_settings(self):
         r_path = self.settings.value("r_path", "", type=str)
@@ -61,6 +55,5 @@ class RDockSettings(QDialog):
             initial = os.path.expanduser("~").replace("\\", "/")
         
         self.initial_wd.setFilePath(initial)
-        self.wd.setFilePath(initial)
 
             
