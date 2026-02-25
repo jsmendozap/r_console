@@ -44,7 +44,7 @@ class RDockWidget(QDockWidget):
             self.state.setToolTip("Ready")
             self.console.setFocus()
 
-    def print(self, line, result):
+    def print_to_console(self, line, result):
 
         self.console.add_to_console(line, result, self._last_command)
 
@@ -284,8 +284,6 @@ class RDockWidget(QDockWidget):
 
     def _clear_console(self):
         self.console.clear()
-        self.console.insertPlainText("R version {self.console_info_left.text()}\n")
-        self.console.insertPlainText("Running on \n\n")
         self.console.insertPlainText(self.console.prompt)
 
     def _build_main_layout(self):

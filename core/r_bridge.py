@@ -1,14 +1,17 @@
-from qgis.PyQt.QtWidgets import QInputDialog
+from qgis.PyQt.QtCore import QSettings
 from shutil import which
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 import json
 import os
 
+class RPathRequiredError(RuntimeError):
+    pass
+
 class RBridge:
-    def __init__(self, plugin_dir, popup = False):
+    def __init__(self, plugin_dir):
         self.plugin_dir = plugin_dir
-        self.popup = popup
-        self.r = 'Rscript' if which('Rscript') is not None else self._request_r_path()
+        self.settings = QSettings("r_console", "RConsole")
+        self.r = self._find_rscript()
         self.process = self._start()
         self.r_version = self._get_r_version()
         self._set_home()
@@ -30,39 +33,20 @@ class RBridge:
         return json.loads(response.strip())
     
     def stop(self):
+        if self.process.poll() is not None:
+            return
         self.process.terminate()
+        try:
+            self.process.wait(timeout=2)
+        except TimeoutExpired:
+            self.process.kill()
+            self.process.wait(timeout=2)
 
     def restart(self):
         self.stop()
         self.process = self._start()
         self.r_version = self._get_r_version()
-
-    def _request_r_path(self):
-
-        settings = os.path.join(self.plugin_dir, 'settings.json')
-        if os.path.exists(settings):
-            try:
-                with open(settings, 'r') as f:
-                    data = json.load(f)
-                    return data['path']
-            except Exception:
-                pass 
-
-        if not self.popup:
-            raise RuntimeError("Rscript not found in PATH.")
-
-        path, ok = QInputDialog.getText(
-            None,
-            "R Not Found in PATH",
-            "Enter the path to Rscript:"
-        )
-        
-        if not ok or not path.strip():
-            raise RuntimeError("Rscript path not found.")
-        
-        with open(os.path.join(self.plugin_dir, 'settings.json'), 'w') as f:
-            json.dump({'path': path.strip()}, f)
-            return path.strip()
+        self._set_home()
             
     def _start(self):
         base = os.path.basename(self.r).lower()
@@ -77,7 +61,6 @@ class RBridge:
             args,
             stdin=PIPE, 
             stdout=PIPE, 
-            stderr=PIPE, 
             text=True,
             bufsize=1,
             cwd=self.plugin_dir
@@ -95,6 +78,17 @@ class RBridge:
         response = self.run_code(code)
         return response["stdout"].strip()
     
+    def _find_rscript(self):
+        path = which('Rscript')
+        if path:
+            return path
+        
+        saved = self.settings.value('r_path')
+        if saved:
+            return saved
+        
+        raise RPathRequiredError("Rscript not found in PATH.")
+
     def _set_home(self):
-        code = f"setwd('{os.path.expanduser('~')}')"
-        self.run_code(code)
+        home = os.path.expanduser('~').replace('\\', '/')
+        self.run_code(f"setwd('{home}')")

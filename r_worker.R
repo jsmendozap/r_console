@@ -1,5 +1,5 @@
 library(jsonlite)
-options(echo = FALSE) # Vital cuando se usa R.exe/R en lugar de Rscript
+options(echo = FALSE) 
 
 cat("READY\n")
 flush(stdout())

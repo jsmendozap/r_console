@@ -1,23 +1,29 @@
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QAction, QInputDialog
 from qgis.core import Qgis
 from qgis.PyQt.QtGui import QIcon
-from os.path import join, dirname
+from qgis.PyQt.QtCore import Qt, QSettings
+import os
+from subprocess import run
+
 from .ui.dock_widget import RDockWidget
-from .core.r_bridge import RBridge
-from qgis.PyQt.QtCore import Qt
-#from importlib.util import find_spec
+from .core.r_thread import RRunner
 
 class Console:
     def __init__(self, iface):
         self.iface = iface
-        self.plugin_dir = dirname(__file__)
+        self.plugin_dir = os.path.dirname(__file__)
+        self.settings = QSettings("r_console", "RConsole")
         self.action = None
         self.dock = None
-        self.r_console = None
+        self.runner = None
+        self._allow_path_popup = None
+        self._runner_ready = False
+        self._initializing = False
+        self._pending_code = None
 
     def initGui(self):
         self.action = QAction(
-            QIcon(join(self.plugin_dir, "Rlogo.png")),
+            QIcon(os.path.join(self.plugin_dir, "Rlogo.png")),
             "R Console",
             self.iface.mainWindow()
         )
@@ -28,49 +34,125 @@ class Console:
         if self.action is not None:
             self.iface.removeToolBarIcon(self.action)
             self.action = None
-        
-        if self.r_console is not None:
-            self.r_console.stop()
-            self.r_console = None
+
+        if self.runner is not None:
+            self.runner.stop()
+            self.runner = None
+
+        self._runner_ready = False
+        self._initializing = False
+        self._pending_code = None
+
+        if self.dock is not None:
+            self.dock.deleteLater()
+            self.dock = None
 
     def run(self):
         if self.dock is None:
             self.dock = RDockWidget(self.iface.mainWindow())
             self.dock.runRequested.connect(self.on_run_requested)
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
-            self._initialize_bridge()
+
+        self._ensure_runner(False)
 
         self.dock.show()
         self.dock.raise_()
 
-    def on_run_requested(self, code):
-        if not code.strip():
-            self.dock.append_output("No code to run.")
-            return
-
-        if self.r_console is None:
-            if not self._initialize_bridge(popup=True):
-                return
-
-        self.dock.executionStateChanged.emit(True)
-        width = self.dock.console.width_cols
+    def _ensure_runner(self, popup):
+        self._allow_path_popup = popup
         
         try:
-            for line in code.splitlines():
-                result = self.r_console.run_code(line, width=width)
-                self.dock.print(line, result)
-        finally:
-            self.dock.new_line()
-            self.dock.executionStateChanged.emit(False)
+            if self.runner is None:
+                self.runner = RRunner()
+                self.runner.initialized.connect(self._on_runner_initialized)
+                self.runner.path_required.connect(self._on_path_required)
+                self.runner.line_result.connect(self.dock.print_to_console)
+                self.runner.run_finished.connect(self._on_runner_finished)
+                self.runner.failed.connect(self._on_runner_failed)
+                self.runner.busy_changed.connect(self.dock.executionStateChanged.emit)
 
-    def _initialize_bridge(self, popup = False):
-        if self.r_console is not None:
-            return True
-            
-        try:
-            self.r_console = RBridge(self.plugin_dir, popup = popup)
-            self.dock.set_console_header(self.r_console.r_version)
+            if not self._runner_ready and not self._initializing:
+                self._initializing = True
+                self.runner.initialize(self.plugin_dir)
+
             return True
         except Exception as e:
-            self.iface.messageBar().pushMessage("R Console Error", f"Failed to initialize R Console: {e}", Qgis.Warning)
+            self.iface.messageBar().pushMessage("R Console Error", str(e), Qgis.Warning)
             return False
+
+    def on_run_requested(self, code):
+        if not code.strip():
+            return
+
+        if not self._ensure_runner(True):
+            return
+
+        if self._initializing or not self._runner_ready:
+            self._pending_code = code   
+            return
+
+        width = self.dock.console.width_cols
+        self.runner.run(code, width)
+
+    def _on_runner_initialized(self, r_version):
+        self._runner_ready = True
+        self._initializing = False
+        self.dock.set_console_header(r_version)
+
+        if self._pending_code:
+            code = self._pending_code
+            self._pending_code = None
+            width = self.dock.console.width_cols
+            self.runner.run(code, width)
+
+    def _on_runner_finished(self):
+        self.dock.new_line()
+
+    def _on_runner_failed(self, msg):
+        self._runner_ready = False
+        self._initializing = False
+        self._pending_code = None
+        self.iface.messageBar().pushMessage("R Console Error", msg, Qgis.Warning)
+
+    def _on_path_required(self):
+        if not self._allow_path_popup:
+            self._on_runner_failed("Rscript not found in PATH.")
+            return 
+        
+        path, ok = QInputDialog.getText(
+            None,
+            "R Not Found in PATH",
+            "Enter the path to Rscript:"
+        )
+
+        if not ok or not path.strip():
+            self._on_runner_failed("Rscript path not provided.")
+            return
+
+        path = path.strip()
+
+        if not self._is_valid_rscript(path):
+            self._on_runner_failed(f"Invalid Rscript path: {path}")
+            return
+
+        self.settings.setValue('r_path', path)
+        self._initializing = True
+        self.runner.initialize(self.plugin_dir)
+
+    def _is_valid_rscript(self, path):
+        path = os.path.realpath(path)
+        if not os.path.isfile(path) or not os.access(path, os.X_OK):
+            return False
+        try:
+            result = run(
+                [path, '-e', 'R.version.string'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            output = result.stdout + result.stderr
+            return 'R version' in output
+        except Exception:
+            return False
+
+    
