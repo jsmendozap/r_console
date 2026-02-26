@@ -47,7 +47,12 @@ class RConsole(QTextEdit):
         if result["stdout"]:
             self.append(f"<pre style='margin:0;'>{html.escape(result['stdout'])}</pre>")
 
+    def append_raw(self, text):
+        if text:
+            self.append(f"<pre style='margin:0;'>{html.escape(text)}</pre>")
+
     def clean(self):
+        self._highlighter.clear_errors()
         self.clear()
         self.insertPlainText(self.prompt)
 

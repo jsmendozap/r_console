@@ -21,8 +21,8 @@ class RHighlighter(QSyntaxHighlighter):
         self.errorFormat.setForeground(QColor("red"))
 
         self.highlightingRules.append((QRegularExpression(r"^> "), promptFormat))
-        self.highlightingRules.append((QRegularExpression(r"\".*\""), stringFormat))
-        self.highlightingRules.append((QRegularExpression(r"'.*'"), stringFormat))
+        self.highlightingRules.append((QRegularExpression(r'"[^"]*"'), stringFormat))
+        self.highlightingRules.append((QRegularExpression(r"'[^']*'"), stringFormat))
         self.highlightingRules.append((QRegularExpression(r"\b[A-Za-z0-9_.]+(?=\()"), funcFormat))
 
     def highlightBlock(self, text):
@@ -38,3 +38,8 @@ class RHighlighter(QSyntaxHighlighter):
     def mark_error_block(self, block):
         self._error_blocks.add(block.blockNumber())
         self.rehighlightBlock(block)
+
+    def clear_errors(self):
+        self._error_blocks.clear()
+        self.rehighlight()
+

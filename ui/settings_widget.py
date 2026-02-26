@@ -1,6 +1,7 @@
-from qgis.PyQt.QtWidgets import QDialog, QFormLayout, QDialogButtonBox, QVBoxLayout
+from qgis.PyQt.QtWidgets import QDialog, QFormLayout, QDialogButtonBox, QVBoxLayout, QMessageBox
 from qgis.gui import QgsFileWidget
-from qgis.PyQt.QtCore import QSettings
+from ..core import utils
+from ..core import plugin_settings
 import os
 
 class RDockSettings(QDialog):
@@ -9,15 +10,22 @@ class RDockSettings(QDialog):
         super().__init__(parent)
         self.setWindowTitle("R Console Settings")
         self.setMinimumSize(600, 150)
-        self.settings = QSettings("r_console", "RConsole")
         self._build_layout()
         self._load_settings()
         self._register_signals()
 
     def save_settings(self):
-        initial = self.initial_wd.filePath().strip()
-        self.settings.setValue("r_path", self.r_path.filePath().strip())
-        self.settings.setValue("initial_wd", initial)
+        r_path = self.r_path.filePath().strip()
+
+        if r_path and not utils.is_valid_rscript(r_path):
+            QMessageBox.warning(
+                self,
+                "Invalid Rscript path",
+                f"The path '{r_path}' is not a valid Rscript executable."
+            )
+            return
+        plugin_settings.set_r_path(r_path)
+        plugin_settings.set_initial_wd(self.initial_wd.filePath().strip())
         self.accept()
 
     def _build_layout(self):
@@ -45,15 +53,12 @@ class RDockSettings(QDialog):
         self.button_box.rejected.connect(self.reject)
 
     def _load_settings(self):
-        r_path = self.settings.value("r_path", "", type=str)
-        initial = self.settings.value("initial_wd", "", type=str)
-        
+        r_path = plugin_settings.get_r_path()
+        initial = plugin_settings.get_initial_wd()
+
         if r_path:
             self.r_path.setFilePath(r_path)
 
-        if not initial:
-            initial = os.path.expanduser("~").replace("\\", "/")
-        
         self.initial_wd.setFilePath(initial)
 
             

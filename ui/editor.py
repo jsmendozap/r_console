@@ -2,6 +2,7 @@ from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtGui import QFont, QColor, QKeySequence
 from qgis.PyQt.QtWidgets import QFrame, QTabWidget, QWidget, QFileDialog, QTabBar, QMessageBox, QShortcut
 from qgis.PyQt.Qsci import QsciScintilla, QsciLexerPython
+import os
 
 try:
     from qgis.PyQt.Qsci import QsciLexerR
@@ -14,7 +15,7 @@ class EditorTab(QsciScintilla):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setUtf8(True)
-        self.is_dirty = True
+        self.is_dirty = False
         self.file_path = None
         self._configure_editor()
         self.textChanged.connect(self.mark_dirty)
@@ -47,7 +48,7 @@ class EditorTab(QsciScintilla):
             self.dirtyChanged.emit(True)
 
     def name(self):
-        base = self.file_path.split("/")[-1] if self.file_path else "Untitled.R"
+        base = self.file_path.split(os.path.basename())[-1] if self.file_path else "Untitled.R"
         return f"*{base}" if self.is_dirty else base
 
     def is_empty(self):

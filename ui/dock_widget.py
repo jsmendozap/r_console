@@ -6,10 +6,12 @@ from qgis.PyQt.QtWidgets import (
     QFileDialog
 )
 import os
+from qgis.PyQt.QtGui import QTextCursor
 
 from .editor import EditorTabsWidget
 from .console_widget import RConsole
 from .settings_widget import RDockSettings
+from ..core import plugin_settings
 
 
 class RDockWidget(QDockWidget):
@@ -21,7 +23,7 @@ class RDockWidget(QDockWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings = RDockSettings()
-        self.wd = self.settings.initial_wd.filePath()
+        self.wd = plugin_settings.get_initial_wd()
         self._last_command = None
         self._shortcuts = []
         self._build_header()
@@ -29,7 +31,8 @@ class RDockWidget(QDockWidget):
         self._build_console_area()
         self._build_main_layout()
         self._connect_signals()
-        self._initialize_state()
+        self.set_running_state(False)
+        
 
     def set_console_header(self, r_version):
         self.console_info_left.setText(f"R {r_version}")
@@ -56,6 +59,17 @@ class RDockWidget(QDockWidget):
             self._set_console_wd(self.wd, False)
 
         self._last_command = None
+
+    def append_welcome(self, result):
+        self.console.moveCursor(QTextCursor.End)
+        self.console.moveCursor(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
+        if self.console.textCursor().selectedText().strip() == self.console.prompt.strip():
+            self.console.textCursor().removeSelectedText()
+        
+        if result.get("stdout"):
+            self.console.append_raw(result["stdout"] + "\n\n")
+
+        self.console.new_line()
 
     def clean_console(self):
         self.console.clean()
@@ -224,7 +238,7 @@ class RDockWidget(QDockWidget):
             self._set_console_wd(path)
 
     def _set_console_wd(self, new_path, emit = True):
-        path = new_path.split(os.sep)
+        path = new_path.replace("\\", "/").split("/")
         self.wd = new_path
         
         if len(path) > 4:
@@ -247,10 +261,6 @@ class RDockWidget(QDockWidget):
 
         self.editor_tabs.register_shortcuts()
         self.console.register_shortcuts()
-
-    def _initialize_state(self):
-        self.clean_console()
-        self.set_running_state(False)
         
     def _emit_run(self):
         code = self.editor_tabs.current_code().strip()

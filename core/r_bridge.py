@@ -1,4 +1,4 @@
-from qgis.PyQt.QtCore import QSettings
+from . import plugin_settings
 from shutil import which
 import subprocess
 import json
@@ -10,8 +10,11 @@ class RPathRequiredError(RuntimeError):
 class RBridge:
     def __init__(self, plugin_dir):
         self.plugin_dir = plugin_dir
-        self.settings = QSettings("r_console", "RConsole")
+        self.process = None
+        self.r_version = None
         self.r = self._find_rscript()
+
+    def initialize(self):
         self.process = self._start()
         self.r_version = self._get_r_version()
         self._set_wd()
@@ -28,7 +31,7 @@ class RBridge:
         response = self.process.stdout.readline().strip()
         
         if not response:
-            raise RuntimeError("R process returned empty response (process might have crashed or path is invalid).")
+            raise RuntimeError("R process returned empty response (process might have crashed).")
             
         return json.loads(response.strip())
     
@@ -62,6 +65,7 @@ class RBridge:
             args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
             cwd=self.plugin_dir, 
@@ -71,7 +75,10 @@ class RBridge:
         ready = process.stdout.readline().strip()
 
         if ready != "READY":
-            raise RuntimeError("Failed to start R worker process.")
+            stderr_output = process.stderr.read().strip()
+            detail = f"\nR stderr: {stderr_output}" if stderr_output else ""
+            process.kill()
+            raise RuntimeError("Failed to start R worker process. {detail}")
         
         return process     
 
@@ -81,18 +88,17 @@ class RBridge:
         return response["stdout"].strip()
     
     def _find_rscript(self):
+        saved = plugin_settings.get_r_path()
+        if saved:
+            return saved
+        
         path = which('Rscript')
         if path:
             return path
         
-        saved = self.settings.value('r_path')
-        if saved:
-            return saved
-        
-        raise RPathRequiredError("Rscript not found in PATH.")
+        raise RPathRequiredError("R/Rscript not found. Plase set the path in settings.")
 
     def _set_wd(self):
-        wd = self.settings.value("initial_wd")
-        if not wd:
-            wd = os.path.expanduser('~').replace('\\', '/')
-        self.run_code(f"setwd('{wd}')")
+        wd = plugin_settings.get_initial_wd()
+        wd = wd.replace('\\', '/').replace('"', '\\"')
+        self.run_code(f'setwd("{wd}")')
