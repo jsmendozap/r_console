@@ -2,7 +2,7 @@ from qgis.PyQt.QtCore import QObject, QThread, pyqtSignal, pyqtSlot, QMetaObject
 from .r_bridge import RBridge, RPathRequiredError
 
 class RWorker(QObject):
-    initialized = pyqtSignal(str)        
+    initialized = pyqtSignal()        
     line_result = pyqtSignal(str, dict)  
     welcome_result = pyqtSignal(dict)
     run_finished = pyqtSignal()
@@ -14,12 +14,12 @@ class RWorker(QObject):
         super().__init__()
         self.bridge = None
 
-    @pyqtSlot(str)
-    def initialize(self, plugin_dir):
+    @pyqtSlot()
+    def initialize(self):
         try:
-            self.bridge = RBridge(plugin_dir)
+            self.bridge = RBridge()
             self.bridge.initialize()
-            self.initialized.emit(self.bridge.r_version)
+            self.initialized.emit()
         except RPathRequiredError:
             self.path_required.emit()
         except Exception as e:
@@ -67,7 +67,7 @@ class RWorker(QObject):
         if self.bridge:
             try:
                 self.bridge.restart()
-                self.initialized.emit(self.bridge.r_version)
+                self.initialized.emit()
             except Exception as e:
                 self.failed.emit(f"Failed to restart R: {e}")
 
@@ -130,14 +130,14 @@ class RWorker(QObject):
 
 
 class RRunner(QObject):
-    initialized = pyqtSignal(str)
+    initialized = pyqtSignal()
     line_result = pyqtSignal(str, dict)
     welcome_result = pyqtSignal(dict)
     run_finished = pyqtSignal()
     failed = pyqtSignal(str)
     busy_changed = pyqtSignal(bool)
     path_required = pyqtSignal()
-    request_initialize = pyqtSignal(str)
+    request_initialize = pyqtSignal()
     request_run = pyqtSignal(str, int)
     request_welcome = pyqtSignal(int)
     request_restart = pyqtSignal()
@@ -165,8 +165,8 @@ class RRunner(QObject):
 
         self._thread.start()
 
-    def initialize(self, plugin_dir):
-        self.request_initialize.emit(plugin_dir)
+    def initialize(self):
+        self.request_initialize.emit()
 
     def run(self, code, width):
         self.request_run.emit(code, width)

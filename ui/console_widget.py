@@ -30,7 +30,6 @@ class RConsole(QTextEdit):
         self._shortcuts.append(clear)
 
     def add_to_console(self, line, result, last_command):
-        #print(line, last_command, result)
         if line and line != last_command:
             self.moveCursor(QTextCursor.End)
             cursor = self.textCursor()
@@ -47,16 +46,16 @@ class RConsole(QTextEdit):
 
         if result["stdout"]:
             self.append(f"<pre style='margin:0;'>{html.escape(result['stdout'])}</pre>")
-        
 
     def append_raw(self, text):
         if text:
             self.append(f"<pre style='margin:0;'>{html.escape(text)}</pre>")
 
-    def clean(self):
+    def clean(self, prompt):
         self._highlighter.clear_errors()
         self.clear()
-        self.insertPlainText(self.prompt)
+        if prompt:
+            self.insertPlainText(self.prompt)
 
     def new_line(self):
         self.append(self.prompt)
@@ -95,16 +94,31 @@ class RConsole(QTextEdit):
 
         super().keyPressEvent(event)
 
+        cursor = self.textCursor()
+        prompt_end = self.document().lastBlock().position() + len(self.prompt)
+        if (cursor.blockNumber() == self.document().blockCount() - 1 
+                and cursor.position() < prompt_end
+                and not cursor.hasSelection()):
+            cursor.setPosition(prompt_end)
+            self.setTextCursor(cursor)
+
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
-        if self.textCursor().blockNumber() < self.document().blockCount() - 1:
-            self.moveCursor(QTextCursor.End)
+        if not self.textCursor().hasSelection():
+            if self.textCursor().blockNumber() < self.document().blockCount() - 1:
+                self.moveCursor(QTextCursor.End)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
-        if self.textCursor().blockNumber() < self.document().blockCount() - 1:
-            self.moveCursor(QTextCursor.End)
-
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            prompt_end = self.document().lastBlock().position() + len(self.prompt)
+            if cursor.blockNumber() < self.document().blockCount() - 1:
+                self.moveCursor(QTextCursor.End)
+            elif cursor.position() < prompt_end:
+                cursor.setPosition(prompt_end)
+                self.setTextCursor(cursor)
+        
     def resizeEvent(self, event):
         super().resizeEvent(event)
         char_width = self.fontMetrics().averageCharWidth()
@@ -136,10 +150,12 @@ class RConsole(QTextEdit):
             self.append("")
 
     def _replace_current_input(self, text):
-        self.moveCursor(QTextCursor.End)
-        self.moveCursor(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
-        self.textCursor().removeSelectedText()
-        self.insertPlainText(self.prompt + text)
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
+        cursor.removeSelectedText()
+        cursor.insertText(self.prompt + text)
+        self.setTextCursor(cursor)
 
     def _clamp_selection(self):
         cursor = self.textCursor()

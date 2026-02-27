@@ -33,10 +33,21 @@ class RDockWidget(QDockWidget):
         self._connect_signals()
         self.set_running_state(False)
         
+    def set_console_header(self, new_path = None, emit = True):
+        if new_path is None:
+            new_path = self.wd
 
-    def set_console_header(self, r_version):
-        self.console_info_left.setText(f"R {r_version}")
-        self._set_console_wd(self.wd)
+        path = new_path.replace("\\", "/").split("/")
+        self.wd = new_path
+        
+        if len(path) > 4:
+            path = path[:2] + ["..."] + path[-2:]
+            new_path = os.sep.join(path)
+        
+        self.console_info_left.setText(new_path)
+        self.console_info_left.setToolTip(self.wd)
+        if emit:
+            self.changeWd.emit(self.wd)
 
     def set_running_state(self, is_running):
         self.run_button.setEnabled(not is_running)
@@ -55,7 +66,7 @@ class RDockWidget(QDockWidget):
         self.console.add_to_console(line, result, self._last_command)
         if result["wd"] and result["wd"] != self.wd:
             self.wd = result["wd"]
-            self._set_console_wd(self.wd, False)
+            self.set_console_header(self.wd, emit = False)
 
         self._last_command = None
 
@@ -70,8 +81,8 @@ class RDockWidget(QDockWidget):
 
         self.console.new_line()
 
-    def clean_console(self):
-        self.console.clean()
+    def clean_console(self, prompt):
+        self.console.clean(prompt)
 
     def new_console_prompt(self):
         self.console.new_line()
@@ -80,9 +91,6 @@ class RDockWidget(QDockWidget):
         return self.console.width_cols
 
     def _build_header(self):
-        # title_label, run/settings/clear buttons
-        self.title = QLabel("R Console") 
-        self.title.setStyleSheet("font-weight: 500; font-size: 14px;")
 
         self.save_button = QToolButton()
         self.save_button.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
@@ -159,14 +167,11 @@ class RDockWidget(QDockWidget):
         self.state.setFixedSize(12, 12)
 
         self.console_info_left = QLabel("")
-        self.console_info_left.setStyleSheet("font-weight:700;")
-        self.console_info_right = QLabel("")
-        self.console_info_right.setStyleSheet("color:#8a8a8a;")
-
-        header_layout.addWidget(self.state)
+        self.console_info_left.setStyleSheet("color:#8a8a8a;")
+        
         header_layout.addWidget(self.console_info_left)
         header_layout.addStretch()
-        header_layout.addWidget(self.console_info_right)
+        header_layout.addWidget(self.state)
 
         self.console = RConsole()
         self.console.setFrameShape(QFrame.NoFrame)
@@ -216,13 +221,12 @@ class RDockWidget(QDockWidget):
         splitter.addWidget(self.output_tabs)
         splitter.setSizes([350, 250])
 
-        layout.addWidget(self.title)
         layout.addWidget(splitter)
 
     def _connect_signals(self):
         self.run_button.clicked.connect(self._emit_run)
         self.settings_button.clicked.connect(self.settings.show)
-        self.clear_button.clicked.connect(self.clean_console)
+        self.clear_button.clicked.connect(lambda: self.console.clean(True))
         self.save_button.clicked.connect(self.editor_tabs.save_current)
         self.open_button.clicked.connect(self.editor_tabs.open_script)
         self.restart_button.clicked.connect(self.restartRequested.emit)
@@ -234,20 +238,7 @@ class RDockWidget(QDockWidget):
     def _on_change_wd(self):
         path = QFileDialog.getExistingDirectory(self, "Change working directory")
         if path:
-            self._set_console_wd(path)
-
-    def _set_console_wd(self, new_path, emit = True):
-        path = new_path.replace("\\", "/").split("/")
-        self.wd = new_path
-        
-        if len(path) > 4:
-            path = path[:2] + ["..."] + path[-2:]
-            new_path = os.sep.join(path)
-        
-        self.console_info_right.setText(new_path)
-        self.console_info_right.setToolTip(self.wd)
-        if emit:
-            self.changeWd.emit(self.wd)
+            self.set_console_header(path)
 
     def _register_shortcuts(self):
         run_ctrl = QShortcut(QKeySequence("Ctrl+Return"), self)

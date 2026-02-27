@@ -20,15 +20,13 @@ class RPathRequiredError(RuntimeError):
     pass
 
 class RBridge:
-    def __init__(self, plugin_dir):
-        self.plugin_dir = plugin_dir
+    def __init__(self):
+        self.plugin_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.process = None
-        self.r_version = None
         self.r = self._find_rscript()
 
     def initialize(self):
         self.process = self._start()
-        self.r_version = self._get_r_version()
         self._set_wd()
         
     def run_code(self, code, width=None):
@@ -114,14 +112,6 @@ class RBridge:
             raise RuntimeError(f"Failed to start R worker process. {detail}")
         
         return process     
-    
-    def _get_r_version(self):
-        code = "cat(paste0(R.Version()$major, '.', R.Version()$minor))"
-        stdout = ""
-        for result in self.run_code(code):
-            if not result.is_done:
-                stdout += result.stdout
-        return stdout.strip()
     
     def _find_rscript(self):
         saved = plugin_settings.get_r_path()

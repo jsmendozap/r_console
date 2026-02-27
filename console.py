@@ -76,7 +76,7 @@ class Console:
 
             if not self._runner_ready and not self._initializing:
                 self._initializing = True
-                self.runner.initialize(self.plugin_dir)
+                self.runner.initialize()
 
             return True
         except Exception as e:
@@ -98,15 +98,14 @@ class Console:
         width = self.dock.console_width()
         self.runner.run(code, width)
 
-    def _on_runner_initialized(self, r_version):
+    def _on_runner_initialized(self):
         self._runner_ready = True
         self._initializing = False
-        self.dock.set_console_header(r_version)
+        self.dock.set_console_header()
 
         width = self.dock.console_width()
         self.runner.welcome_message(width)
         self.dock.new_console_prompt()
-
 
         if self._pending_code:
             code = self._pending_code
@@ -146,12 +145,12 @@ class Console:
 
         plugin_settings.set_r_path(path)
         self._initializing = True
-        self.runner.initialize(self.plugin_dir)
+        self.runner.initialize()
 
     def _on_restart_requested(self):
         if self.runner:
             self.runner.restart_r()
-            self.dock.clean_console()
+            self.dock.clean_console(prompt=False)
     
     def _on_change_wd(self, path):
         if self.runner:
