@@ -85,7 +85,7 @@ class RWorker(QObject):
     def change_wd(self, path):
         if self.bridge:
             try:
-                path = path.replace('"', '\\"')
+                path = path.replace('\\', '/').replace('"', '\\"')
                 for _ in self.bridge.run_code(f'setwd("{path}")'):
                     pass
             except Exception as e:

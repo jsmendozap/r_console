@@ -48,7 +48,7 @@ class EditorTab(QsciScintilla):
             self.dirtyChanged.emit(True)
 
     def name(self):
-        base = self.file_path.split(os.path.basename())[-1] if self.file_path else "Untitled.R"
+        base = self.file_path.split(os.sep)[-1] if self.file_path else "Untitled.R"
         return f"*{base}" if self.is_dirty else base
 
     def is_empty(self):

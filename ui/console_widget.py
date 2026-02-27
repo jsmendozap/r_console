@@ -26,7 +26,7 @@ class RConsole(QTextEdit):
 
     def register_shortcuts(self):
         clear = QShortcut(QKeySequence("Ctrl+L"), self)
-        clear.activated.connect(self.clean)
+        clear.activated.connect(lambda: self.clean(True))
         self._shortcuts.append(clear)
 
     def add_to_console(self, line, result, last_command):
@@ -104,9 +104,6 @@ class RConsole(QTextEdit):
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
-        if not self.textCursor().hasSelection():
-            if self.textCursor().blockNumber() < self.document().blockCount() - 1:
-                self.moveCursor(QTextCursor.End)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
