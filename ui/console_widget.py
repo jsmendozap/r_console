@@ -30,7 +30,8 @@ class RConsole(QTextEdit):
         self._shortcuts.append(clear)
 
     def add_to_console(self, line, result, last_command):
-        if line != last_command:
+        #print(line, last_command, result)
+        if line and line != last_command:
             self.moveCursor(QTextCursor.End)
             cursor = self.textCursor()
             cursor.movePosition(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
@@ -46,6 +47,7 @@ class RConsole(QTextEdit):
 
         if result["stdout"]:
             self.append(f"<pre style='margin:0;'>{html.escape(result['stdout'])}</pre>")
+        
 
     def append_raw(self, text):
         if text:

@@ -12,25 +12,25 @@ class RWorker(QObject):
 
     def __init__(self):
         super().__init__()
-        self._bridge = None
+        self.bridge = None
 
     @pyqtSlot(str)
     def initialize(self, plugin_dir):
         try:
-            self._bridge = RBridge(plugin_dir)
-            self._bridge.initialize()
-            self.initialized.emit(self._bridge.r_version)
+            self.bridge = RBridge(plugin_dir)
+            self.bridge.initialize()
+            self.initialized.emit(self.bridge.r_version)
         except RPathRequiredError:
             self.path_required.emit()
         except Exception as e:
-            if self._bridge is not None:
-                self._bridge.stop()
-                self._bridge = None
+            if self.bridge is not None:
+                self.bridge.stop()
+                self.bridge = None
             self.failed.emit(f"Failed to initialize R Console: {e}")
 
     @pyqtSlot(str, int)
     def run_code_block(self, code, width):
-        if self._bridge is None:
+        if self.bridge is None:
             self.failed.emit("R bridge is not initialized.")
             self.run_finished.emit()
             return
@@ -38,49 +38,56 @@ class RWorker(QObject):
         self.busy_changed.emit(True)
         try:
             for expression in self._split_into_expressions(code):
-                result = self._bridge.run_code(expression, width=width)
-                self.line_result.emit(expression, result)
+                first = True
+                for result in self.bridge.run_code(expression, width=width):
+                    expr = expression if first else ""
+                    if not result.is_done:
+                        self.line_result.emit(expr,result.to_dict())
+                        first = False
+                    else:
+                        self.line_result.emit(expr, result.to_dict())
         except Exception as e:
             self.failed.emit(f"Execution error: {e}")
         finally:
             self.busy_changed.emit(False)
             self.run_finished.emit()
 
-    @pyqtSlot(str, int)
-    def run_welcome(self, code, width):
-        if self._bridge is None:
+    @pyqtSlot(int)
+    def run_welcome(self, width):
+        if self.bridge is None:
             return
         try:
-            result = self._bridge.run_code(code, width=width)
-            self.welcome_result.emit(result)
+            result = self.bridge.run_welcome(width=width)
+            self.welcome_result.emit(result.to_dict())
         except Exception as e:
             self.failed.emit(f"Welcome message error: {e}")
 
     @pyqtSlot()
     def restart_r(self):
-        if self._bridge:
+        if self.bridge:
             try:
-                self._bridge.restart()
-                self.initialized.emit(self._bridge.r_version)
+                self.bridge.restart()
+                self.initialized.emit(self.bridge.r_version)
             except Exception as e:
                 self.failed.emit(f"Failed to restart R: {e}")
 
     @pyqtSlot()
     def shutdown(self):
         try:
-            if self._bridge is not None:
-                self._bridge.stop()
+            if self.bridge is not None:
+                self.bridge.stop()
         except Exception:
             pass
         finally:
-            self._bridge = None
+            self.bridge = None
 
     @pyqtSlot(str)
     def change_wd(self, path):
-        if self._bridge:
+        if self.bridge:
             try:
                 path = path.replace('"', '\\"')
-                self._bridge.run_code(f'setwd("{path}")')
+                for _ in self.bridge.run_code(f'setwd("{path}")'):
+                    pass
             except Exception as e:
                 self.failed.emit(f"Failed to change working directory: {e}")
 
@@ -132,7 +139,7 @@ class RRunner(QObject):
     path_required = pyqtSignal()
     request_initialize = pyqtSignal(str)
     request_run = pyqtSignal(str, int)
-    request_welcome = pyqtSignal(str, int)
+    request_welcome = pyqtSignal(int)
     request_restart = pyqtSignal()
     request_change_wd = pyqtSignal(str)
 
@@ -165,11 +172,7 @@ class RRunner(QObject):
         self.request_run.emit(code, width)
 
     def welcome_message(self, width):
-        welcome_code = "\n".join([
-        'cat(R.version.string, "\\n")',
-        'cat("Running under", format(utils::osVersion), "\\n")',
-        ])
-        self.request_welcome.emit(welcome_code, width)
+        self.request_welcome.emit(width)
 
     def restart_r(self):
         self.request_restart.emit()

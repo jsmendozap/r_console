@@ -53,8 +53,7 @@ class RDockWidget(QDockWidget):
     def append_result(self, line, result):
 
         self.console.add_to_console(line, result, self._last_command)
-
-        if result["wd"] != self.wd:
+        if result["wd"] and result["wd"] != self.wd:
             self.wd = result["wd"]
             self._set_console_wd(self.wd, False)
 
@@ -67,7 +66,7 @@ class RDockWidget(QDockWidget):
             self.console.textCursor().removeSelectedText()
         
         if result.get("stdout"):
-            self.console.append_raw(result["stdout"] + "\n\n")
+            self.console.append_raw(result["stdout"] + "\n")
 
         self.console.new_line()
 
