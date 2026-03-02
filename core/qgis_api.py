@@ -4,8 +4,10 @@ import tempfile
 import os
 
 class QGISApi(QObject):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
+        self.result = None
+        self.needs_update = False
 
     @pyqtSlot('PyQt_PyObject', result='PyQt_PyObject')
     def dispatch(self, msg):
@@ -61,4 +63,14 @@ class QGISApi(QObject):
         QgsVectorFileWriter.writeAsVectorFormat(layers[0], path)
         return {"type": "response", "path": path}
         """
-        
+    
+    def update_state(self):
+        self.needs_update = True
+
+    @pyqtSlot(result='PyQt_PyObject')
+    def check_update(self):
+        if not self.needs_update:
+            self.result = None
+            return None
+        self._needs_update = False
+        return self.project_state()

@@ -86,7 +86,7 @@
                 options(width = request$width)
             }
 
-            if (!is.null(request$type) && request$type == "init") {
+            if (!is.null(request$type) && request$type %in% c("init", "update")) {
                 qgis <- QgisProject$new(request$data)
                 assign("qgis", qgis, envir = globalenv())
                 send_done()

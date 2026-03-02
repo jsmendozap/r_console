@@ -17,9 +17,14 @@ class RBridge:
     def initialize(self):
         self.process = self._start()
         self._set_wd()
-        self._init_qgis_project()
+        self._send_project_update(type="init")
         
     def run_code(self, code, width=None):
+
+        QMetaObject.invokeMethod(self.qgis_api, "check_update", Qt.BlockingQueuedConnection)
+        if self.qgis_api.result:
+            self._send_project_update(type="update")
+
         data = {"code": code}
         if width:
             data["width"] = int(width)
@@ -114,13 +119,13 @@ class RBridge:
         
         return process     
     
-    def _init_qgis_project(self):
+    def _send_project_update(self, type):
         QMetaObject.invokeMethod(
             self.qgis_api, "project_state",
             Qt.BlockingQueuedConnection
         )
         state = self.qgis_api.result
-        msg = {"type": "init", "data": state}
+        msg = {"type": f"{type}", "data": state}
         self.process.stdin.write(json.dumps(msg) + "\n")
         self.process.stdin.flush()
         self.process.stdout.readline().strip()

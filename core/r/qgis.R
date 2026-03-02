@@ -38,7 +38,7 @@ local({
                           private$.crs <- res$crs
                           private$.units <- res$units
                           private$.layers <- paste0(res$layers, collapse = ", ")
-                          #invisible(self)
+                          invisible(self)
                         },
                         
                         list_layers = function(type = NULL) {
@@ -52,19 +52,6 @@ local({
                           
                           response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
                           return(response[[2]])
-                        },
-
-                        project_state = function() {
-                          msg <- toJSON(list(type = "request", method = "project_state"),
-                                        auto_unbox = TRUE, 
-                                        null = "null"
-                                      )
-                          
-                          cat(msg, "\n", file = .out, sep = "") 
-                          flush(.out)
-
-                          response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
-                          return(response[-1])
                         },
                         
                         print = function(...) {

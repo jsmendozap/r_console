@@ -1,5 +1,5 @@
 from qgis.PyQt.QtWidgets import QAction, QInputDialog
-from qgis.core import Qgis
+from qgis.core import Qgis, QgsProject
 from qgis.PyQt import sip
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtCore import Qt
@@ -28,6 +28,7 @@ class Console:
         self._state = RSessionState.UNINITIALIZED
         self._allow_path_popup = False
         self._pending_code = None
+        self.qgis_api = None
 
     def initGui(self):
         self.action = QAction(
@@ -52,10 +53,7 @@ class Console:
     def run(self):
         if self.dock is None:
             self.dock = RDockWidget(self.iface.mainWindow())
-            self.dock.runRequested.connect(self._on_run_requested)
-            self.dock.restartRequested.connect(self._on_restart_requested)
-            self.dock.changeWd.connect(self._on_change_wd)
-            self.dock.closing.connect(self._stop_runner)
+            self.__connect_dock_signals()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
 
         self._ensure_runner(False)
@@ -65,14 +63,9 @@ class Console:
 
     def _start_runner(self):
         self.qgis_api = QGISApi()
+        self._listen_project_updates()
         self.runner = RRunner(self.qgis_api)
-        self.runner.initialized.connect(self._on_runner_initialized)
-        self.runner.path_required.connect(self._on_path_required)
-        self.runner.line_result.connect(self.dock.append_result)
-        self.runner.welcome_result.connect(self.dock.append_welcome)
-        self.runner.run_finished.connect(self._on_runner_finished)
-        self.runner.failed.connect(self._on_runner_failed)
-        self.runner.busy_changed.connect(self.dock.executionStateChanged.emit)
+        self._connect_ruuner_signals()
 
     def _stop_runner(self):
         if self.runner is not None:
@@ -164,3 +157,29 @@ class Console:
         if self.runner:
             self.runner.change_wd(path)
 
+    def _listen_project_updates(self):
+        project = QgsProject.instance()
+        signals = [
+            project.titleChanged,
+            project.crsChanged,
+            project.readProject,
+            project.layersAdded,
+            project.layersRemoved,
+        ]
+        for signal in signals:
+            signal.connect(lambda *args: self.qgis_api.update_state())
+
+    def __connect_dock_signals(self):
+        self.dock.runRequested.connect(self._on_run_requested)
+        self.dock.restartRequested.connect(self._on_restart_requested)
+        self.dock.changeWd.connect(self._on_change_wd)
+        self.dock.closing.connect(self._stop_runner)
+
+    def _connect_ruuner_signals(self):
+        self.runner.initialized.connect(self._on_runner_initialized)
+        self.runner.path_required.connect(self._on_path_required)
+        self.runner.line_result.connect(self.dock.append_result)
+        self.runner.welcome_result.connect(self.dock.append_welcome)
+        self.runner.run_finished.connect(self._on_runner_finished)
+        self.runner.failed.connect(self._on_runner_failed)
+        self.runner.busy_changed.connect(self.dock.executionStateChanged.emit)
