@@ -1,6 +1,6 @@
 from qgis.PyQt.QtCore import QMetaObject, Qt, Q_ARG
 from .r_result import RResult
-from .utils import RPathRequiredError
+from .utils import RPathRequiredError, root_dir
 from . import plugin_settings
 from shutil import which
 import subprocess
@@ -9,7 +9,7 @@ import os
 
 class RBridge:
     def __init__(self, qgis_api):
-        self.plugin_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.plugin_dir = root_dir()
         self.process = None
         self.qgis_api = qgis_api
         self.r = self._find_rscript()

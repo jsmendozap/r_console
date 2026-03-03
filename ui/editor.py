@@ -1,15 +1,13 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal
-from qgis.PyQt.QtGui import QFont, QColor, QKeySequence
+from qgis.PyQt.QtGui import QColor, QKeySequence
 from qgis.PyQt.QtWidgets import QFrame, QTabWidget, QWidget, QFileDialog, QTabBar, QMessageBox, QShortcut
-from qgis.PyQt.Qsci import QsciScintilla, QsciLexerPython
+from qgis.PyQt.Qsci import QsciScintilla, QsciAPIs
+from qgis.gui import QgsCodeEditorR
+
+from ..core.utils import root_dir
 import os
 
-try:
-    from qgis.PyQt.Qsci import QsciLexerR
-except ImportError:
-    QsciLexerR = None
-
-class EditorTab(QsciScintilla):
+class EditorTab(QgsCodeEditorR):
     dirtyChanged = pyqtSignal(bool)
     
     def __init__(self, parent=None):
@@ -17,8 +15,10 @@ class EditorTab(QsciScintilla):
         self.setUtf8(True)
         self.is_dirty = False
         self.file_path = None
-        self._configure_editor()
+        self.setTabWidth(2)
+        self.setFrameShape(QFrame.NoFrame)
         self.textChanged.connect(self.mark_dirty)
+        self._setup_autocomplete()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Return and event.modifiers() == Qt.NoModifier:
@@ -36,6 +36,9 @@ class EditorTab(QsciScintilla):
         else:
             super().keyPressEvent(event)
 
+        if event.text() and event.text().isalnum() or event.text() == '.':
+            self.autoCompleteFromAll()
+    
     def mark_saved(self, path):
         self.file_path = path
         if self.is_dirty:
@@ -54,27 +57,34 @@ class EditorTab(QsciScintilla):
     def is_empty(self):
         return self.text().strip() == ""
 
-    def _configure_editor(self):
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        self.setFont(font)
-        self.setMarginsFont(font)
+    def _setup_autocomplete(self):
+        self.setAutoCompletionSource(QsciScintilla.AcsAll)
+        self.setAutoCompletionThreshold(2)
+        self.setAutoCompletionCaseSensitivity(False)
+        self.setAutoCompletionUseSingle(QsciScintilla.AcusNever)
+        self.setAutoCompletionReplaceWord(True)
 
-        self.setMarginType(0, QsciScintilla.NumberMargin)
-        self.setMarginWidth(0, "00")
-        self.setMarginLineNumbers(0, True)
-        self.setMarginsForegroundColor(Qt.gray)
-        self.setFrameShape(QFrame.NoFrame)
-        self.setBraceMatching(QsciScintilla.SloppyBraceMatch)
-        self.setAutoIndent(True)
-        self.setTabWidth(2)
-        self.setIndentationsUseTabs(False)
-        self.setIndentationGuides(True)
+        lexer_actual = self.lexer()
 
-        if QsciLexerR is not None:
-            self.setLexer(QsciLexerR(self))
-        else:
-            self.setLexer(QsciLexerPython(self))
+        if lexer_actual:
+            self.api = QsciAPIs(lexer_actual)
+
+            palabras_clave = lexer_actual.keywords(1)
+            funciones_base = lexer_actual.keywords(2)
+
+            if palabras_clave:
+                for palabra in palabras_clave.split():
+                    self.api.add(palabra)
+
+            if funciones_base:
+                for funcion in funciones_base.split():
+                    self.api.add(funcion)
+
+            path = os.path.join(root_dir(), "resources", "keywords.api")
+            if os.path.exists(path):
+                self.api.load(path)
+
+            self.api.prepare()
 
 
 class EditorTabsWidget(QTabWidget):
