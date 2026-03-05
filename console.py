@@ -16,6 +16,7 @@ class RSessionState(Enum):
     UNINITIALIZED = auto()
     INITIALIZING = auto()
     READY = auto()
+    RUNNING = auto()
     FAILED = auto()
 
 class Console:
@@ -29,6 +30,8 @@ class Console:
         self._allow_path_popup = False
         self._pending_code = None
         self.qgis_api = None
+        self._project_signals_connected = False
+        self._project_signals = None
 
     def initGui(self):
         self.action = QAction(
@@ -45,6 +48,7 @@ class Console:
             self.action = None
 
         self._stop_runner()
+        self._disconnect_project_updates()
 
         if self.dock is not None:
             self.dock.deleteLater()
@@ -53,7 +57,7 @@ class Console:
     def run(self):
         if self.dock is None:
             self.dock = RDockWidget(self.iface.mainWindow())
-            self.__connect_dock_signals()
+            self._connect_dock_signals()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
 
         self._ensure_runner(False)
@@ -65,7 +69,7 @@ class Console:
         self.qgis_api = QGISApi()
         self._listen_project_updates()
         self.runner = RRunner(self.qgis_api)
-        self._connect_ruuner_signals()
+        self._connect_runner_signals()
 
     def _stop_runner(self):
         if self.runner is not None:
@@ -74,8 +78,9 @@ class Console:
         
         if self.qgis_api is not None:
             self.qgis_api.remove_temp_files()
+            self.qgis_api = None
 
-        self._state = RSessionState.UNINITIALIZED
+        self._set_state(RSessionState.UNINITIALIZED)
         self._pending_code = None
         if self.dock is not None and not sip.isdeleted(self.dock):
             self.dock.clean_console(prompt=False)
@@ -85,8 +90,8 @@ class Console:
         try:
             if self.runner is None:
                 self._start_runner()
-            if self._state == RSessionState.UNINITIALIZED:
-                self._state = RSessionState.INITIALIZING
+            if self._state == RSessionState.UNINITIALIZED or self._state == RSessionState.FAILED:
+                self._set_state(RSessionState.INITIALIZING)
                 self.runner.initialize()
             return True
         except Exception as e:
@@ -100,27 +105,39 @@ class Console:
         if not self._ensure_runner(True):
             return
 
-        if self._state != RSessionState.READY:
+        if self._state in (RSessionState.INITIALIZING, RSessionState.RUNNING):
             if self._pending_code is None:
                 self._pending_code = code
             return
 
+        if self._state != RSessionState.READY:
+            return
+
+        self._set_state(RSessionState.RUNNING)
         self.runner.run(code, self.dock.console_width())
 
     def _on_runner_initialized(self):
-        self._state = RSessionState.READY
+        self._set_state(RSessionState.READY)
         self.runner.welcome_message(self.dock.console_width())
-        self.dock.new_console_prompt()
 
         if self._pending_code:
             code, self._pending_code = self._pending_code, None
+            self._set_state(RSessionState.RUNNING)
             self.runner.run(code, self.dock.console_width())
 
     def _on_runner_finished(self):
-        self.dock.new_console_prompt()
+        if self._state == RSessionState.RUNNING:
+            self._set_state(RSessionState.READY)
+
+        if self._pending_code:
+            code, self._pending_code = self._pending_code, None
+            self._set_state(RSessionState.RUNNING)
+            self.runner.run(code, self.dock.console_width())
+        else:
+            self.dock.new_console_prompt()
 
     def _on_runner_failed(self, msg):
-        self._state = RSessionState.FAILED
+        self._set_state(RSessionState.FAILED)
         self._pending_code = None
         self.iface.messageBar().pushMessage("R Console Error", msg, Qgis.Warning)
 
@@ -146,12 +163,12 @@ class Console:
             return
 
         plugin_settings.set_r_path(path)
-        self._state = RSessionState.INITIALIZING
+        self._set_state(RSessionState.INITIALIZING)
         self.runner.initialize()
 
     def _on_restart_requested(self, path):
         if self.runner:
-            self._state = RSessionState.INITIALIZING
+            self._set_state(RSessionState.INITIALIZING)
             self.runner.restart_r()
             self.runner.change_wd(path)
             self.dock.clean_console(prompt=False)
@@ -160,23 +177,32 @@ class Console:
         if self.runner:
             self.runner.change_wd(path)
 
+    def _on_project_changed(self, *args):
+        if self.qgis_api is not None:
+            self.qgis_api.update_state()
+
     def _listen_project_updates(self):
+        if self._project_signals_connected:
+            return
+
         project = QgsProject.instance()
-        signals = [
+        self._project_signals = [
             project.titleChanged,
             project.crsChanged,
             project.readProject,
         ]
-        for signal in signals:
-            signal.connect(lambda *args: self.qgis_api.update_state())
+        for signal in self._project_signals:
+            signal.connect(self._on_project_changed)
+        
+        self._project_signals_connected = True
 
-    def __connect_dock_signals(self):
+    def _connect_dock_signals(self):
         self.dock.runRequested.connect(self._on_run_requested)
         self.dock.restartRequested.connect(self._on_restart_requested)
         self.dock.changeWd.connect(self._on_change_wd)
         self.dock.closing.connect(self._stop_runner)
 
-    def _connect_ruuner_signals(self):
+    def _connect_runner_signals(self):
         self.runner.initialized.connect(self._on_runner_initialized)
         self.runner.path_required.connect(self._on_path_required)
         self.runner.line_result.connect(self.dock.append_result)
@@ -184,3 +210,19 @@ class Console:
         self.runner.run_finished.connect(self._on_runner_finished)
         self.runner.failed.connect(self._on_runner_failed)
         self.runner.busy_changed.connect(self.dock.executionStateChanged.emit)
+
+    def _disconnect_project_updates(self):
+        if not self._project_signals_connected:
+            return
+
+        for signal in self._project_signals or []:
+            try:
+                signal.disconnect(self._on_project_changed)
+            except TypeError:
+                pass
+
+        self._project_signals = None
+        self._project_signals_connected = False
+
+    def _set_state(self, state):
+        self._state = state

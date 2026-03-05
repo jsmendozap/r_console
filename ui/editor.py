@@ -1,11 +1,12 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal
-from qgis.PyQt.QtGui import QColor, QKeySequence
+from qgis.PyQt.QtGui import QColor, QKeySequence, QFont
 from qgis.PyQt.QtWidgets import QFrame, QTabWidget, QWidget, QFileDialog, QTabBar, QMessageBox, QShortcut
 from qgis.PyQt.Qsci import QsciScintilla, QsciAPIs
 from qgis.gui import QgsCodeEditorR
 
 from ..core.utils import root_dir
 import os
+import re
 
 class EditorTab(QgsCodeEditorR):
     dirtyChanged = pyqtSignal(bool)
@@ -19,26 +20,16 @@ class EditorTab(QgsCodeEditorR):
         self.setFrameShape(QFrame.NoFrame)
         self.textChanged.connect(self.mark_dirty)
         self._setup_autocomplete()
+        self._force_colors_lexer()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Return and event.modifiers() == Qt.NoModifier:
-            line, col = self.getCursorPosition()
-            text = self.text(line)
-            before_cursor = text[:col].strip() if text else ""
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self._handle_enter(event)
+            return
 
-            super().keyPressEvent(event)
+        super().keyPressEvent(event)
+        self._handle_autocomplete(event.text())
 
-            if before_cursor.endswith(("{", "(", "[", "%>%", "|>", "+")):
-                new_line = line + 1
-                prev_indent = self.indentation(line)
-                self.setIndentation(new_line, prev_indent + self.tabWidth())
-                self.setCursorPosition(new_line, prev_indent + self.tabWidth())
-        else:
-            super().keyPressEvent(event)
-
-        if event.text() and event.text().isalnum() or event.text() == '.':
-            self.autoCompleteFromAll()
-    
     def mark_saved(self, path):
         self.file_path = path
         if self.is_dirty:
@@ -58,34 +49,101 @@ class EditorTab(QgsCodeEditorR):
         return self.text().strip() == ""
 
     def _setup_autocomplete(self):
-        self.setAutoCompletionSource(QsciScintilla.AcsAll)
+        self.setAutoCompletionSource(QsciScintilla.AcsAPIs)
         self.setAutoCompletionThreshold(2)
-        self.setAutoCompletionCaseSensitivity(False)
         self.setAutoCompletionUseSingle(QsciScintilla.AcusNever)
-        self.setAutoCompletionReplaceWord(True)
 
-        lexer_actual = self.lexer()
+        self.setCallTipsStyle(QsciScintilla.CallTipsNoContext)
+        self.setCallTipsPosition(QsciScintilla.CallTipsAboveText)
+        self.setCallTipsVisible(1)
 
-        if lexer_actual:
-            self.api = QsciAPIs(lexer_actual)
+        self.api = QsciAPIs(self.lexer())
 
-            palabras_clave = lexer_actual.keywords(1)
-            funciones_base = lexer_actual.keywords(2)
+        api_path = os.path.join(root_dir(), "resources", "r_functions.api")
+        if os.path.exists(api_path):
+            self.api.load(api_path)
 
-            if palabras_clave:
-                for palabra in palabras_clave.split():
-                    self.api.add(palabra)
+        self.api.prepare()
 
-            if funciones_base:
-                for funcion in funciones_base.split():
-                    self.api.add(funcion)
+    def _handle_enter(self, event):
+        if self.isListActive():
+            super().keyPressEvent(event)
+            return
 
-            path = os.path.join(root_dir(), "resources", "keywords.api")
-            if os.path.exists(path):
-                self.api.load(path)
+        line, col = self.getCursorPosition()
+        opens     = self.text(line)[:col].strip().endswith(("{", "(", "[", "%>%", "|>", "+"))
+        super().keyPressEvent(event)
 
-            self.api.prepare()
+        if opens:
+            new_indent = self.indentation(line) + self.tabWidth()
+            self.setIndentation(line + 1, new_indent)
+            self.setCursorPosition(line + 1, new_indent)
 
+    def _handle_autocomplete(self, char):
+        line, col   = self.getCursorPosition()
+        text_before = self.text(line)[:col]
+        in_qgis     = bool(re.search(r'qgis\$[a-zA-Z0-9_]*$', text_before))
+
+        self.setAutoCompletionSource(
+            QsciScintilla.AcsNone if in_qgis else QsciScintilla.AcsAPIs
+        )
+
+        if char == "$" and in_qgis:
+            self.SendScintilla(self.SCI_AUTOCSETSEPARATOR, 32)
+            self.SendScintilla(self.SCI_AUTOCSHOW, 0, b"get_layer insert_layer list_layers")
+
+        elif char == "(":
+            self._show_calltip(text_before)
+
+    def _show_calltip(self, text_before):
+        calltips = {
+            "qgis$get_layer(":    b"x, ...",
+            "qgis$insert_layer(": b"layer, name = NULL, ...",
+            "qgis$list_layers(":  b"type = NULL",
+        }
+        for prefix, args in calltips.items():
+            if text_before.endswith(prefix):
+                self.SendScintilla(self.SCI_CALLTIPSHOW,
+                                self.SendScintilla(self.SCI_GETCURRENTPOS), args)
+                break
+
+    def _force_colors_lexer(self):
+        lexer = self.lexer()
+        
+        if not lexer:
+            print("Error: QgsCodeEditorR no inicializó un lexer base.")
+            return
+
+        fuente = QFont("Monospace", 10)
+        lexer.setDefaultFont(fuente)
+
+        is_dark_theme = self.paper().lightness() < 128
+
+        general   = QColor("#D4D4D4") if is_dark_theme else QColor("#000000")  
+        keywords  = QColor("#569CD6") if is_dark_theme else QColor("#3A3AC3")  
+        strings   = QColor("#CE9178") if is_dark_theme else QColor("#2e7d32")  
+        numbers   = QColor("#B5CEA8") if is_dark_theme else QColor("#098658")  
+        comments  = QColor("#6A9955") if is_dark_theme else QColor("#A6AAA6")  
+        operators = QColor("#569CD6") if is_dark_theme else QColor("#6A6A6D")  
+
+        lexer.setColor(general,   0)   # Default
+        lexer.setColor(comments,  1)   # Comment
+        lexer.setColor(keywords,  2)   # Keyword - for, while, if
+        lexer.setColor(general,   3)   # Base Keyword - print, mean
+        lexer.setColor(general,   4)   # Other Keyword
+        lexer.setColor(numbers,   5)   # Number
+        lexer.setColor(strings,   6)   # String
+        lexer.setColor(strings,   7)   # String 2
+        lexer.setColor(operators, 8)   # Operator
+        lexer.setColor(general,   9)   # Identifier - variables, mutate
+        lexer.setColor(operators, 10)  # Infix - %in%, %>%
+        lexer.setColor(operators, 11)  # Infix EOL
+        lexer.setColor(strings,   12)  # Backticks
+        lexer.setColor(strings,   13)  # Raw String
+        lexer.setColor(strings,   14)  # Raw String 2
+        lexer.setColor(strings,   15)  # Escape Sequence
+
+        self.setLexer(lexer)
 
 class EditorTabsWidget(QTabWidget):
     def __init__(self, parent=None):

@@ -1,8 +1,9 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal
-from qgis.PyQt.QtGui import QFont, QTextCursor, QKeySequence
+from qgis.PyQt.QtGui import QFont, QTextCursor, QKeySequence, QTextCharFormat
 from qgis.PyQt.QtWidgets import QTextEdit, QShortcut
 from .highlighter import RHighlighter
 import html
+
 
 class RConsole(QTextEdit):
     runRequested = pyqtSignal(str)
@@ -16,11 +17,11 @@ class RConsole(QTextEdit):
         self.setAcceptRichText(False)
         self.setReadOnly(False)
         self._width_cols = 80
-        
+
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         self.setFont(font)
-        
+
         self._highlighter = RHighlighter(self.document())
         self.selectionChanged.connect(self._clamp_selection)
 
@@ -39,11 +40,12 @@ class RConsole(QTextEdit):
                 cursor.insertText(self.prompt + line)
             else:
                 self.append(self.prompt + line)
+
             self.history_list.append(line)
             self.history_index = len(self.history_list)
 
         if result.get("error") is not None:
-            self.append(f"<span style='color:red; font-weight:400'>Error: </span><span style='font-weight:400'>{html.escape(result['error'])}</span>")
+            self.append(f"<span style='color:#c0392b;'>Error: {html.escape(result['error'])}</span>")
 
         if result.get("stdout"):
             self.append(f"<pre style='margin:0;'>{html.escape(result['stdout'])}</pre>")
@@ -61,9 +63,13 @@ class RConsole(QTextEdit):
         self.append(self.prompt)
         self.moveCursor(QTextCursor.End)
 
+    @property
+    def width_cols(self):
+        return self._width_cols
+
     def keyPressEvent(self, event):
         cursor = self.textCursor()
-        
+
         if cursor.blockNumber() < self.document().blockCount() - 1:
             if not cursor.hasSelection():
                 self.moveCursor(QTextCursor.End)
@@ -72,11 +78,10 @@ class RConsole(QTextEdit):
             if event.modifiers() == Qt.NoModifier:
                 self._handle_enter()
                 return
-        
+
         if event.key() in (Qt.Key_Backspace, Qt.Key_Delete, Qt.Key_Left):
-            cursor = self.textCursor()
             prompt_end = self.document().lastBlock().position() + len(self.prompt)
-            if cursor.position() <= prompt_end:
+            if cursor.position() <= prompt_end and not cursor.hasSelection():
                 return
 
         if event.key() == Qt.Key_Up:
@@ -96,14 +101,11 @@ class RConsole(QTextEdit):
 
         cursor = self.textCursor()
         prompt_end = self.document().lastBlock().position() + len(self.prompt)
-        if (cursor.blockNumber() == self.document().blockCount() - 1 
+        if (cursor.blockNumber() == self.document().blockCount() - 1
                 and cursor.position() < prompt_end
                 and not cursor.hasSelection()):
             cursor.setPosition(prompt_end)
             self.setTextCursor(cursor)
-
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
@@ -115,16 +117,31 @@ class RConsole(QTextEdit):
             elif cursor.position() < prompt_end:
                 cursor.setPosition(prompt_end)
                 self.setTextCursor(cursor)
-        
+
+    def insertFromMimeData(self, source):
+        """Block paste if it would modify protected area. Strip newlines."""
+        if source.hasText():
+            cursor = self.textCursor()
+            prompt_end = self.document().lastBlock().position() + len(self.prompt)
+            if cursor.position() < prompt_end:
+                self.moveCursor(QTextCursor.End)
+            text = source.text().replace("\n", " ").replace("\r", "")
+            self.textCursor().insertText(text)
+
+    def createStandardContextMenu(self):
+        menu = super().createStandardContextMenu()
+        restricted = {"Cut", "Paste", "Cortar", "Pegar",
+                      "Ausschneiden", "Einfügen", "Couper", "Coller"}
+        for action in menu.actions():
+            if action.text() in restricted:
+                action.setEnabled(False)
+        return menu
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         char_width = self.fontMetrics().averageCharWidth()
         if char_width > 0:
             self._width_cols = max(40, int(self.viewport().width() / char_width) - 20)
-
-    @property
-    def width_cols(self):
-        return self._width_cols
 
     def _handle_enter(self):
         self.moveCursor(QTextCursor.End)
@@ -156,16 +173,16 @@ class RConsole(QTextEdit):
         cursor = self.textCursor()
         if not cursor.hasSelection():
             return
-        
+
         block_start = self.document().lastBlock().position()
         prompt_end = block_start + len(self.prompt)
-        
+
         start = min(cursor.selectionStart(), cursor.selectionEnd())
         end = max(cursor.selectionStart(), cursor.selectionEnd())
-        
-        if start < prompt_end < end:
-            self.selectionChanged.disconnect(self._clamp_selection)
+
+        if start < prompt_end <= end:
+            self.blockSignals(True)
             cursor.setPosition(end)
             cursor.setPosition(prompt_end, QTextCursor.KeepAnchor)
             self.setTextCursor(cursor)
-            self.selectionChanged.connect(self._clamp_selection)
+            self.blockSignals(False)

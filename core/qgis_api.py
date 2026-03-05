@@ -59,7 +59,7 @@ class QGISApi(QObject):
         field = args.get("value")
         
         if column == "name":
-            layer = QgsProject.instance().mapLayersByName(field)
+            layer = QgsProject.instance().mapLayersByName(field)[0]
         elif column == "id":
             layer = QgsProject.instance().mapLayer(field)
         else: 
@@ -69,19 +69,22 @@ class QGISApi(QObject):
         if not layer:
             return {"type": "error", "error": f"Layer not found: {field}"}
 
-        type = layer[0].type()
+        if layer.providerType() in ("wms", "bing", "xyz"):
+            return {"type": "response", "error": f"Layer '{field}' is a base map and cannot be exported"}
+
+        type = layer.type()
         if type == QgsMapLayer.VectorLayer:
             fd, path = tempfile.mkstemp(suffix=".fgb")
             os.close(fd)
-            processing.run("native:savefeatures", {'INPUT': layer[0], 'OUTPUT': path})
+            processing.run("native:savefeatures", {'INPUT': layer, 'OUTPUT': path})
         elif type == QgsMapLayer.RasterLayer:
-            print("entró")
             fd, path = tempfile.mkstemp(suffix=".tif")
             os.close(fd)
-            processing.run("gdal:translate", {'INPUT': layer[0], 'OUTPUT': path, 'OPTIONS': ''})
+            processing.run("gdal:translate", {'INPUT': layer, 'OUTPUT': path, 'OPTIONS': ''})
         else:
             return {"type": "error", "error": f"Unsupported layer type: {type}"}
 
+        self._temp_files.append(path)
         return {"type": "response", "path": path}
     
     def insert_layer(self, args):
@@ -118,7 +121,7 @@ class QGISApi(QObject):
         if not self.needs_update:
             self.result = None
             return None
-        self._needs_update = False
+        self.needs_update = False
         return self.project_state()
     
     def remove_temp_files(self):

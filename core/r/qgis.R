@@ -73,16 +73,16 @@ local({
                           return(response[[2]])
                         },
 
-                        get_layer = function(field, ...) {
+                        get_layer = function(x, ...) {
                           
-                          if (!is.character(field) || length(field) != 1) {
-                            stop("field argument must be a character of length 1", call. = FALSE)
+                          if (!is.character(x) || length(x) != 1) {
+                            stop("x argument must be a character of length 1", call. = FALSE)
                           }
                           
-                          is_id <- grepl("_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}$", field)
+                          is_id <- grepl("_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}$", x)
                           column <- if (is_id) "id" else "name"
 
-                          msg <- toJSON(list(type = "request", method = "get_layer", args = list(col = column, value = field)),
+                          msg <- toJSON(list(type = "request", method = "get_layer", args = list(col = column, value = x)),
                                         auto_unbox = TRUE, 
                                         null = "null"
                                       )
