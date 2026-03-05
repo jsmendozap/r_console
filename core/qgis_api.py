@@ -1,5 +1,6 @@
 from qgis.PyQt.QtCore import QObject, pyqtSlot
-from qgis.core import QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer, QgsVectorLayer
+from qgis.core import QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer, QgsVectorLayer, QgsWkbTypes
+
 import processing
 import tempfile
 import os
@@ -21,6 +22,8 @@ class QGISApi(QObject):
                 self.result = self.get_layer(msg.get("args", {}))
             case "insert_layer":
                 self.result = self.insert_layer(msg.get("args", {}))
+            case "layer_info":
+                self.result = self.get_layer_info(msg.get("args", {}))
             case "project_state":
                 self.result = self.project_state()
             case _:
@@ -117,6 +120,50 @@ class QGISApi(QObject):
         self.needs_update = True
 
     @pyqtSlot(result='PyQt_PyObject')
+    def get_layer_info(self, args):
+        column = args.get("column")
+        field = args.get("value")
+        
+        if column == "name":
+            layer = QgsProject.instance().mapLayersByName(field)[0]
+        else:
+            layer = QgsProject.instance().mapLayer(field)
+        
+        if not layer or layer is None:
+            self.result = {"type": "response", "error": f"Layer not found"}
+            return
+        
+        info = {
+            "type": "response",
+            "name": layer.name(),
+            "crs": layer.crs().authid(),
+            "units": QgsUnitTypes.toString(layer.crs().mapUnits()),
+            "extent": {
+                "xmin": layer.extent().xMinimum(),
+                "xmax": layer.extent().xMaximum(),
+                "ymin": layer.extent().yMinimum(),
+                "ymax": layer.extent().yMaximum(),
+            }
+        }
+
+        type = layer.type()
+        if type == QgsMapLayer.VectorLayer:
+            info["layer_type"] = "vector"
+            info["geometry"] = QgsWkbTypes.displayString(layer.wkbType())
+            info["features"] = layer.featureCount()
+            info["fields"] = [f.name() for f in layer.fields()]
+
+        elif type == QgsMapLayer.RasterLayer:
+            info["layer_type"] = "raster"
+            info["bands"] = layer.bandCount()
+            info["width"] = layer.width()
+            info["height"] = layer.height()
+            info["res_x"] = layer.rasterUnitsPerPixelX()
+            info["res_y"] = layer.rasterUnitsPerPixelY()
+
+        return info
+
+    @pyqtSlot(result='PyQt_PyObject')
     def check_update(self):
         if not self.needs_update:
             self.result = None
@@ -126,7 +173,6 @@ class QGISApi(QObject):
     
     def remove_temp_files(self):
         for path in self._temp_files:
-            print(path)
             if os.path.exists(path):
                 os.remove(path)
         self._temp_files = []

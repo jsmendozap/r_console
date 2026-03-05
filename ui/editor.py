@@ -7,6 +7,7 @@ from qgis.gui import QgsCodeEditorR
 from ..core.utils import root_dir
 import os
 import re
+import json
 
 class EditorTab(QgsCodeEditorR):
     dirtyChanged = pyqtSignal(bool)
@@ -19,6 +20,7 @@ class EditorTab(QgsCodeEditorR):
         self.setTabWidth(2)
         self.setFrameShape(QFrame.NoFrame)
         self.textChanged.connect(self.mark_dirty)
+        self._methods, self._calltips = self._load_calltips()
         self._setup_autocomplete()
         self._force_colors_lexer()
 
@@ -90,21 +92,24 @@ class EditorTab(QgsCodeEditorR):
 
         if char == "$" and in_qgis:
             self.SendScintilla(self.SCI_AUTOCSETSEPARATOR, 32)
-            self.SendScintilla(self.SCI_AUTOCSHOW, 0, b"get_layer insert_layer list_layers")
+            self.SendScintilla(self.SCI_AUTOCSHOW, 0, self._methods)
 
         elif char == "(":
             self._show_calltip(text_before)
 
+    def _load_calltips(self):
+        path = os.path.join(root_dir(), "core", "r", "calltips.json")
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data["methods"].encode(), data["calltips"]
+
     def _show_calltip(self, text_before):
-        calltips = {
-            "qgis$get_layer(":    b"x, ...",
-            "qgis$insert_layer(": b"layer, name = NULL, ...",
-            "qgis$list_layers(":  b"type = NULL",
-        }
-        for prefix, args in calltips.items():
+        for prefix, args in self._calltips.items():
             if text_before.endswith(prefix):
+                encoded = args.encode("utf-8")
                 self.SendScintilla(self.SCI_CALLTIPSHOW,
-                                self.SendScintilla(self.SCI_GETCURRENTPOS), args)
+                    self.SendScintilla(self.SCI_GETCURRENTPOS),
+                    encoded)
                 break
 
     def _force_colors_lexer(self):

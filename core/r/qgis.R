@@ -25,6 +25,23 @@ local({
                             invisible(library(terra))
                             private$.pkgs_loaded <- TRUE
                           }
+                        }, 
+
+                        .send_request = function(method, args = NULL) {
+                          msg <- toJSON(
+                              list(type = "request", method = method, args = args),
+                              auto_unbox = TRUE,
+                              null = "null"
+                          )
+
+                          cat(msg, "\n", file = .out, sep = "")
+                          flush(.out)
+                          
+                          fromJSON(readLines("stdin", n = 1, warn = FALSE))
+                        }, 
+
+                        .is_id = function(x) {
+                          grepl("_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}$", x)
                         }
                       ),
                       
@@ -61,16 +78,8 @@ local({
                              stop("type argument must be an integer between 0 and 9 or NULL", call. = FALSE)
                            }
 
-                          msg <- toJSON(list(type = "request", method = "list_layers", args = list(type = type)),
-                                        auto_unbox = TRUE, 
-                                        null = "null"
-                                      )
-                          
-                          cat(msg, "\n", file = .out, sep = "") 
-                          flush(.out)
-                          
-                          response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
-                          return(response[[2]])
+                          response <- private$.send_request("list_layers", list(type = type))
+                          return(response$layers)
                         },
 
                         get_layer = function(x, ...) {
@@ -79,18 +88,8 @@ local({
                             stop("x argument must be a character of length 1", call. = FALSE)
                           }
                           
-                          is_id <- grepl("_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}$", x)
-                          column <- if (is_id) "id" else "name"
-
-                          msg <- toJSON(list(type = "request", method = "get_layer", args = list(col = column, value = x)),
-                                        auto_unbox = TRUE, 
-                                        null = "null"
-                                      )
-
-                          cat(msg, "\n", file = .out, sep = "") 
-                          flush(.out)
-
-                          response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
+                          column <- if (private$.is_id(x)) "id" else "name"
+                          response <- private$.send_request("get_layer", list(column = column, value = x))
                           
                           if (!is.null(response$error)) stop(response$error, call. = FALSE)
 
@@ -119,19 +118,46 @@ local({
                             writeRaster(layer, path)
                           }
 
-                          msg <- toJSON(list(type = "request", method = "insert_layer", 
-                                            args = list(path = path, name = name)),
-                                        auto_unbox = TRUE, null = "null")
-
-                          cat(msg, "\n", file = .out, sep = "") 
-                          flush(.out)
-
-                          response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
+                          response <- private$.send_request("insert_layer", list(path = path, name = name))
                           
                           cat("Layer inserted with id: ", response$id, "\n")
                           invisible(self)
                         },
                         
+                        layer_info = function(x){
+                          if (!is.character(x) || length(x) != 1) {
+                            stop("x must be a character of length 1", call. = FALSE)
+                          }
+
+                          column <- if (private$.is_id(x)) "id" else "name"
+                          response <- private$.send_request("layer_info", list(column = column, value = x))
+
+                          if (!is.null(response$error)) stop(response$error, call. = FALSE)
+                                                  
+                          cat(paste0("<Layer: ", response$name, ">"), "\n")
+                          cat("@ Type:", response$layer_type, "\n")
+                          cat("@ CRS: ", response$crs, "\n")
+                          cat("@ Extent:", "\n",
+                              "   xmin =", response$extent$xmin, "\n",
+                              "   xmax =", response$extent$xmax, "\n",
+                              "   ymin =", response$extent$ymin, "\n",
+                              "   ymax =", response$extent$ymax, "\n")
+                          
+                          if (response$layer_type == "vector") {
+                              cat("@ Geometry:", response$geometry, "\n")
+                              cat("@ Features:", response$features, "\n")
+                              cat("@ Fields:\n")
+                              cat("   ", paste(response$fields, collapse = "\n    "))
+                          } else {
+                              cat("@ Bands:      ", response$bands, "\n")
+                              cat("@ Dimensions: ", response$width, "x", response$height, "\n")
+                              cat("@ Resolution:", response$res_x, "x", response$res_y, response$units, "\n")
+                          }
+                          
+                          invisible(self)
+
+                        },
+
                         print = function(...) {
                           cat("<QGIS Project Object>\n")
                           cat("@ Title:", private$.title, "\n")
