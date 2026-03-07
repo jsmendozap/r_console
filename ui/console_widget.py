@@ -41,8 +41,9 @@ class RConsole(QTextEdit):
             else:
                 self.append(self.prompt + line)
 
-            self.history_list.append(line)
-            self.history_index = len(self.history_list)
+            if "\n" not in line:
+                self.history_list.append(line)
+                self.history_index = len(self.history_list)
 
         if result.get("error") is not None:
             self.append(f"<span style='color:#c0392b;'>Error: {html.escape(result['error'])}</span>")
@@ -120,11 +121,13 @@ class RConsole(QTextEdit):
 
     def insertFromMimeData(self, source):
         if source.hasText():
+            text = source.text()
+            if "\n" in text or "\r" in text:
+                return
             cursor = self.textCursor()
             prompt_end = self.document().lastBlock().position() + len(self.prompt)
             if cursor.position() < prompt_end:
                 self.moveCursor(QTextCursor.End)
-            text = source.text().replace("\n", " ").replace("\r", "")
             self.textCursor().insertText(text)
 
     def createStandardContextMenu(self):

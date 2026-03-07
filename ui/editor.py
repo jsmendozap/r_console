@@ -80,14 +80,30 @@ class EditorTab(QgsCodeEditorR):
             super().keyPressEvent(event)
             return
 
-        line, col = self.getCursorPosition()
-        opens     = self.text(line)[:col].strip().endswith(("{", "(", "[", "%>%", "|>", "+"))
+        line, _ = self.getCursorPosition()
+        line_text = self.text(line).rstrip()
+        is_pipe = line_text.endswith(("%>%", "|>", "+"))
+        is_open = line_text.endswith(("{", "(", "["))
+        prev_is_pipe = line > 0 and self.text(line - 1).rstrip().endswith(("%>%", "|>", "+"))
+
         super().keyPressEvent(event)
 
-        if opens:
-            new_indent = self.indentation(line) + self.tabWidth()
-            self.setIndentation(line + 1, new_indent)
-            self.setCursorPosition(line + 1, new_indent)
+        current_indent = self.indentation(line)
+
+        if is_open or (is_pipe and not prev_is_pipe):
+            new_indent = current_indent + self.tabWidth()
+        elif not is_pipe and prev_is_pipe:
+            new_indent = max(0, current_indent - self.tabWidth())
+        elif not is_pipe and not prev_is_pipe:
+            start = line
+            while start > 0 and self.text(start - 1).rstrip().endswith(("%>%", "|>", "+")):
+                start -= 1
+            new_indent = min(current_indent, self.indentation(start))
+        else:
+            new_indent = current_indent
+
+        self.setIndentation(line + 1, new_indent)
+        self.setCursorPosition(line + 1, new_indent)
 
     def _handle_autocomplete(self, char):
         line, col   = self.getCursorPosition()

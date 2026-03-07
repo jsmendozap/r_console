@@ -3,7 +3,7 @@ from qgis.PyQt.QtGui import QIcon, QKeySequence
 from qgis.PyQt.QtWidgets import (
     QDockWidget, QWidget, QVBoxLayout, QHBoxLayout, QToolButton,
     QTabWidget, QSplitter, QLabel, QStyle, QFrame, QShortcut,
-    QFileDialog
+    QFileDialog, QApplication
 )
 import os
 from qgis.PyQt.QtGui import QTextCursor
@@ -61,7 +61,6 @@ class RDockWidget(QDockWidget):
         else:
             self._set_state_icon(is_running)
             self.state.setToolTip("Ready")
-            self.console.setFocus()
 
     def append_result(self, line, result):
 
@@ -91,6 +90,8 @@ class RDockWidget(QDockWidget):
 
     def new_console_prompt(self):
         self.console.new_line()
+        if self._from_console:
+            self.console.setFocus()
 
     def console_width(self):
         return self.console.width_cols
@@ -265,6 +266,9 @@ class RDockWidget(QDockWidget):
         self.console.register_shortcuts()
         
     def _emit_run(self, run_all=False):
+        focused = QApplication.focusWidget()
+        if isinstance(focused, RConsole):
+            return
         editor = self.editor_tabs.currentWidget()
         if not isinstance(editor, EditorTab):
             return
