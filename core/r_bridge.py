@@ -124,8 +124,9 @@ class RBridge:
     
     def _send_project_update(self, type):
         QMetaObject.invokeMethod(
-            self.qgis_api, "project_state",
-            Qt.BlockingQueuedConnection
+            self.qgis_api, "dispatch",
+            Qt.BlockingQueuedConnection,
+            Q_ARG('PyQt_PyObject', {"method": "project_state"})
         )
         state = self.qgis_api.result
         msg = {"type": f"{type}", "data": state}

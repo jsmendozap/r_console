@@ -35,7 +35,7 @@ class Console:
 
     def initGui(self):
         self.action = QAction(
-            QIcon(os.path.join(self.plugin_dir, "Rlogo.png")),
+            QIcon(os.path.join(self.plugin_dir, "resources", "Rlogo.png")),
             "R Console",
             self.iface.mainWindow()
         )
@@ -66,7 +66,7 @@ class Console:
         self.dock.raise_()
 
     def _start_runner(self):
-        self.qgis_api = QGISApi()
+        self.qgis_api = QGISApi(self.iface)
         self._listen_project_updates()
         self.runner = RRunner(self.qgis_api)
         self._connect_runner_signals()

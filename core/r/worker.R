@@ -52,7 +52,11 @@
                     send_chunk(paste0("Warning: ", conditionMessage(x), "\n"))
                     invokeRestart("muffleWarning")
                 },
-                    error = \(x) error_msg <<- conditionMessage(x)
+                message = function(x) {
+                    send_chunk(conditionMessage(x))
+                    invokeRestart("muffleMessage")
+                },
+                error = \(x) error_msg <<- conditionMessage(x)
             )
 
             for (i in seq_along(exprs)) {

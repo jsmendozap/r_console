@@ -1,9 +1,11 @@
 {
-    "methods": "get_layer insert_layer layer_info list_layers",
+    "methods": "get_layer insert_layer layer_info list_layers get_canvas_extent get_selected_features",
     "calltips": {
         "qgis$get_layer(":    "get_layer(x, ...)",
         "qgis$insert_layer(": "insert_layer(layer, name = NULL, ...)",
         "qgis$layer_info(":   "layer_info(x)",
-        "qgis$list_layers(":  "list_layers(type = NULL)"
+        "qgis$list_layers(":  "list_layers(type = NULL)",
+        "qgis$get_canvas_extent(": "get_canvas_extent()",
+        "qgis$get_selected_features(": "get_selected_features()"
     }
 }

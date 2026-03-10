@@ -1,16 +1,21 @@
 from qgis.PyQt.QtCore import QObject, pyqtSlot
-from qgis.core import QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer, QgsVectorLayer, QgsWkbTypes
+from qgis.core import (
+    QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer,
+    QgsVectorLayer, QgsWkbTypes, QgsProcessingFeatureSourceDefinition
+)
 
 import processing
+import uuid
 import tempfile
 import os
 
 class QGISApi(QObject):
-    def __init__(self):
+    def __init__(self, iface):
         super().__init__()
         self.result = None
         self.needs_update = False
         self._temp_files = []
+        self.iface = iface
 
     @pyqtSlot('PyQt_PyObject', result='PyQt_PyObject')
     def dispatch(self, msg):
@@ -26,6 +31,10 @@ class QGISApi(QObject):
                 self.result = self.get_layer_info(msg.get("args", {}))
             case "project_state":
                 self.result = self.project_state()
+            case "canvas_extent":
+                self.result = self.get_canvas_extent()
+            case "selected_features":
+                self.result = self.get_selected_features()
             case _:
                 self.result = {"type": "response", "error": f"Unknown method: {method}"}
         
@@ -34,14 +43,14 @@ class QGISApi(QObject):
     @pyqtSlot(result='PyQt_PyObject')
     def project_state(self):
         project = QgsProject.instance()
-        self.result = {
+        result = {
             "type": "response",
             "title": project.title(),
             "path": project.homePath(),
-            "crs": project.crs().authid(),
+            "crs": project.crs().userFriendlyIdentifier(),
             "units": QgsUnitTypes.toString(project.crs().mapUnits())
         }
-        return self.result
+        return result
 
     def list_layers(self, args):
         type = args.get("type")
@@ -62,27 +71,27 @@ class QGISApi(QObject):
         field = args.get("value")
         
         if column == "name":
-            layer = QgsProject.instance().mapLayersByName(field)[0]
+            layer = QgsProject.instance().mapLayersByName(field)
+            if not layer:
+                return {"type": "error", "error": f"Layer not found: {field}"}
+            layer = layer[0]
         elif column == "id":
             layer = QgsProject.instance().mapLayer(field)
+            if layer is None:
+                return {"type": "error", "error": f"Layer not found: {field}"}
         else: 
             result = {"type": "error", "error": f"Unknown layer: {column}"}
             return result
-        
-        if not layer:
-            return {"type": "error", "error": f"Layer not found: {field}"}
 
         if layer.providerType() in ("wms", "bing", "xyz"):
             return {"type": "response", "error": f"Layer '{field}' is a base map and cannot be exported"}
 
         type = layer.type()
         if type == QgsMapLayer.VectorLayer:
-            fd, path = tempfile.mkstemp(suffix=".fgb")
-            os.close(fd)
+            path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")
             processing.run("native:savefeatures", {'INPUT': layer, 'OUTPUT': path})
         elif type == QgsMapLayer.RasterLayer:
-            fd, path = tempfile.mkstemp(suffix=".tif")
-            os.close(fd)
+            path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.tif")
             processing.run("gdal:translate", {'INPUT': layer, 'OUTPUT': path, 'OPTIONS': ''})
         else:
             return {"type": "error", "error": f"Unsupported layer type: {type}"}
@@ -116,8 +125,38 @@ class QGISApi(QObject):
         self._temp_files.append(path)
         return {"type": "response", "id": layer.id()}
     
-    def update_state(self):
-        self.needs_update = True
+    def get_canvas_extent(self):
+        response = {
+            "type": "response",
+            "wkt": self.iface.mapCanvas().extent().asWktPolygon(), 
+            "crs": self.iface.mapCanvas().mapSettings().destinationCrs().authid()
+            }
+        return response
+
+    def get_selected_features(self):
+        layer = self.iface.activeLayer()
+        
+        if layer is None:
+            self.result = {"type": "response", "error": "No active layer"}
+            return
+        
+        if not hasattr(layer, 'selectedFeatureCount'):
+            self.result = {"type": "response", "error": "Active layer is not a vector layer"}
+            return
+        
+        if layer.selectedFeatureCount() == 0:
+            self.result = {"type": "response", "error": "No features selected"}
+            return
+
+        path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")        
+        processing.run("native:savefeatures", {
+            'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True),
+            'OUTPUT': path
+        })
+        
+        self._temp_files.append(path)
+
+        return {"type": "response", "path": path}
 
     @pyqtSlot(result='PyQt_PyObject')
     def get_layer_info(self, args):
@@ -125,13 +164,14 @@ class QGISApi(QObject):
         field = args.get("value")
         
         if column == "name":
-            layer = QgsProject.instance().mapLayersByName(field)[0]
+            layer = QgsProject.instance().mapLayersByName(field)
+            if not layer:
+                return {"type": "response", "error": "Layer not found"}
+            layer = layer[0]
         else:
             layer = QgsProject.instance().mapLayer(field)
-        
-        if not layer or layer is None:
-            self.result = {"type": "response", "error": f"Layer not found"}
-            return
+            if layer is None:
+                return {"type": "response", "error": "Layer not found"}
         
         info = {
             "type": "response",
@@ -163,13 +203,16 @@ class QGISApi(QObject):
 
         return info
 
+    def update_state(self):
+        self.needs_update = True
+
     @pyqtSlot(result='PyQt_PyObject')
     def check_update(self):
         if not self.needs_update:
             self.result = None
             return None
         self.needs_update = False
-        return self.project_state()
+        self.dispatch({"method": "project_state", "args": None})
     
     def remove_temp_files(self):
         for path in self._temp_files:

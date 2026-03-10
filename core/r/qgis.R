@@ -20,8 +20,8 @@ QgisProject <- R6Class("QgisProject",
                             }
 
                             if (!private$.pkgs_loaded) {
-                              invisible(library(sf))
-                              invisible(library(terra))
+                              suppressPackageStartupMessages(library(sf, quietly = TRUE))
+                              suppressPackageStartupMessages(library(terra,  quietly = TRUE))
                               private$.pkgs_loaded <- TRUE
                             }
                           }, 
@@ -65,6 +65,7 @@ QgisProject <- R6Class("QgisProject",
                         
                         public = list(
                           initialize = function(data = NULL){
+                            private$.ensure_pkgs()
                             if (is.null(data)) {
                               data <- private$.send_request("project_state")
                             }
@@ -91,11 +92,9 @@ QgisProject <- R6Class("QgisProject",
                             }
                             
                             column <- if (private$.is_id(x)) "id" else "name"
-                            response <- private$.send_request("get_layer", list(column = column, value = x))
+                            response <- private$.send_request("get_layer", list(col = column, value = x))
                             
                             if (!is.null(response$error)) stop(response$error, call. = FALSE)
-
-                            private$.ensure_pkgs()
                             
                             if (tools::file_ext(response$path) == "fgb"){
                               layer <- st_read(response$path, quiet = TRUE, ...)
@@ -111,8 +110,6 @@ QgisProject <- R6Class("QgisProject",
 
                             ext <- if (inherits(layer, "sf")) ".fgb" else ".tif"
                             path <- tempfile(fileext = ext)
-
-                            private$.ensure_pkgs()
 
                             if (inherits(layer, "sf")) {
                               st_write(layer, path, quiet = TRUE, ...)
@@ -157,7 +154,19 @@ QgisProject <- R6Class("QgisProject",
                             }
                             
                             invisible(self)
+                          },
 
+                          get_canvas_extent = function() {
+                            response <- private$.send_request("canvas_extent")
+                            extent <- st_as_sfc(response$wkt, crs = response$crs, class = "WKT")
+                            return(st_bbox(extent))
+                          },
+
+                          get_selected_features = function() {
+                            response <- private$.send_request("selected_features")
+                            if (!is.null(response$error)) stop(response$error, call. = FALSE)
+                            layer <- st_read(response$path, quiet = TRUE)
+                            return(layer)
                           },
 
                           print = function(...) {
