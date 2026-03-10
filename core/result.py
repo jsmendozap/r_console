@@ -1,8 +1,21 @@
+"""Defines the RResult class for parsing messages from the R process."""
 from .utils import MissingDependencyError
 
 class RResult(dict):
+    """
+    A dictionary-like object that parses and represents a JSON message from R.
+
+    It categorizes the message (e.g., chunk of output, error, request for data)
+    and provides convenient properties to access its contents.
+    """
 
     def __init__(self, msg):
+        """
+        Initializes and parses the message from R.
+
+        Args:
+            msg (dict): The raw JSON message received from the R subprocess.
+        """
         super().__init__()
         self.stdout = ""
         self.error = None
@@ -17,6 +30,15 @@ class RResult(dict):
         self._parse(msg)
 
     def _parse(self, msg):
+        """
+        Parses the raw message dictionary and sets the object's properties.
+
+        Args:
+            msg (dict): The raw JSON message.
+
+        Raises:
+            MissingDependencyError: If R reports a missing package.
+        """
         match msg["type"]:
             case "expression":
                 self.expression = msg["data"]
@@ -45,4 +67,9 @@ class RResult(dict):
                 raise MissingDependencyError(f"The following R packages are required but are not installed: {msg['data']}")
 
     def __bool__(self):
+        """
+        Returns False if the message indicates the end of an execution block.
+
+        This is used to control the loop in RBridge.run_code.
+        """
         return not self.is_done

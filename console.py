@@ -7,12 +7,13 @@ from enum import Enum, auto
 import os
 
 from .ui.dock_widget import RDockWidget
-from .core.r_thread import RRunner
+from .core.thread import RRunner
 from .core.qgis_api import QGISApi
 from .core import plugin_settings
 from .core import utils
 
 class RSessionState(Enum):
+    """Enumeration for the state of the R session."""
     UNINITIALIZED = auto()
     INITIALIZING = auto()
     READY = auto()
@@ -20,6 +21,15 @@ class RSessionState(Enum):
     FAILED = auto()
 
 class Console:
+    """
+    Main controller for the R Console plugin.
+
+    This class manages the plugin's lifecycle, UI (dock widget), and the
+    background R process. It acts as an intermediary between the UI events
+    (from RDockWidget) and the R execution logic (in RRunner), using a state
+    machine (RSessionState) to handle the R session's status (e.g., ready,
+    running, failed).
+    """
     def __init__(self, iface):
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
@@ -34,6 +44,7 @@ class Console:
         self._project_signals = None
 
     def initGui(self):
+        """Initializes the plugin's GUI components (toolbar icon)."""
         self.action = QAction(
             QIcon(os.path.join(self.plugin_dir, "resources", "Rlogo.png")),
             "R Console",
@@ -43,6 +54,7 @@ class Console:
         self.iface.addToolBarIcon(self.action)
 
     def unload(self):
+        """Cleans up resources when the plugin is unloaded."""
         if self.action is not None:
             self.iface.removeToolBarIcon(self.action)
             self.action = None
@@ -55,6 +67,12 @@ class Console:
             self.dock = None
 
     def run(self):
+        """
+        Shows the R Console dock widget.
+
+        If the dock widget doesn't exist, it creates it. It also ensures the
+        R runner is initialized.
+        """
         if self.dock is None:
             self.dock = RDockWidget(self.iface.mainWindow())
             self._connect_dock_signals()
@@ -66,12 +84,14 @@ class Console:
         self.dock.raise_()
 
     def _start_runner(self):
+        """Creates and initializes the RRunner and its background thread."""
         self.qgis_api = QGISApi(self.iface)
         self._listen_project_updates()
         self.runner = RRunner(self.qgis_api)
         self._connect_runner_signals()
 
     def _stop_runner(self):
+        """Stops the R runner thread and cleans up associated resources."""
         if self.runner is not None:
             self.runner.stop()
             self.runner = None
@@ -86,6 +106,15 @@ class Console:
             self.dock.clean_console(prompt=False)
 
     def _ensure_runner(self, popup):
+        """
+        Ensures the R runner is started and ready.
+
+        If the runner is not initialized or has failed, it attempts to start it.
+
+        Args:
+            popup (bool): If True, allows showing a popup to the user to ask for
+                          the Rscript path if it's not found.
+        """
         self._allow_path_popup = popup
         try:
             if self.runner is None:
@@ -99,6 +128,15 @@ class Console:
             return False
 
     def _on_run_requested(self, code):
+        """
+        Slot triggered when the user requests to run code from the UI.
+
+        It ensures the runner is ready and then asks it to execute the code.
+        If the runner is busy, the code is queued to run later.
+
+        Args:
+            code (str): The R code to execute.
+        """
         if not code.strip():
             return
 
@@ -117,6 +155,12 @@ class Console:
         self.runner.run(code, self.dock.console_width())
 
     def _on_runner_initialized(self):
+        """
+        Slot triggered when the R runner has successfully initialized.
+
+        Sets the state to READY, displays the welcome message, and runs any
+        pending code that was queued while initializing.
+        """
         self._set_state(RSessionState.READY)
         self.runner.welcome_message(self.dock.console_width())
 
@@ -126,6 +170,12 @@ class Console:
             self.runner.run(code, self.dock.console_width())
 
     def _on_runner_finished(self):
+        """
+        Slot triggered after a code execution block finishes.
+
+        Sets the state back to READY and either runs the next pending code
+        block or shows a new prompt in the console.
+        """
         if self._state == RSessionState.RUNNING:
             self._set_state(RSessionState.READY)
 
@@ -137,11 +187,23 @@ class Console:
             self.dock.new_console_prompt()
 
     def _on_runner_failed(self, msg):
+        """
+        Slot triggered when the R runner encounters a critical error.
+
+        Args:
+            msg (str): The error message to display.
+        """
         self._set_state(RSessionState.FAILED)
         self._pending_code = None
         self.iface.messageBar().pushMessage("R Console Error", msg, Qgis.Warning)
 
     def _on_path_required(self):
+        """
+        Slot triggered when Rscript executable is not found.
+
+        If allowed, it prompts the user to provide the path to Rscript.
+        If the path is valid, it saves it and retries initialization.
+        """
         if not self._allow_path_popup:
             self._on_runner_failed("Rscript not found in PATH.")
             return 
@@ -167,6 +229,12 @@ class Console:
         self.runner.initialize()
 
     def _on_restart_requested(self, path):
+        """
+        Slot triggered when the user requests to restart the R session.
+
+        Args:
+            path (str): The working directory to set after restarting.
+        """
         if self.runner:
             self._set_state(RSessionState.INITIALIZING)
             self.runner.restart_r()
@@ -174,14 +242,22 @@ class Console:
             self.dock.clean_console(prompt=False)
     
     def _on_change_wd(self, path):
+        """Slot to change the working directory in the R session."""
         if self.runner:
             self.runner.change_wd(path)
 
     def _on_project_changed(self, *args):
+        """
+        Slot triggered by QGIS project signals (e.g., CRS changed, project loaded).
+
+        Flags the QGISApi to send an update to the R process before the next
+        code execution.
+        """
         if self.qgis_api is not None:
             self.qgis_api.update_state()
 
     def _listen_project_updates(self):
+        """Connects to QGIS project signals to detect changes."""
         if self._project_signals_connected:
             return
 
@@ -197,12 +273,14 @@ class Console:
         self._project_signals_connected = True
 
     def _connect_dock_signals(self):
+        """Connects signals from the RDockWidget to this controller's slots."""
         self.dock.runRequested.connect(self._on_run_requested)
         self.dock.restartRequested.connect(self._on_restart_requested)
         self.dock.changeWd.connect(self._on_change_wd)
         self.dock.closing.connect(self._stop_runner)
 
     def _connect_runner_signals(self):
+        """Connects signals from the RRunner to this controller's slots."""
         self.runner.initialized.connect(self._on_runner_initialized)
         self.runner.path_required.connect(self._on_path_required)
         self.runner.line_result.connect(self.dock.append_result)
@@ -213,6 +291,7 @@ class Console:
         self.runner.pkg_loaded.connect(self.dock.on_pkg_loaded)
 
     def _disconnect_project_updates(self):
+        """Disconnects from all QGIS project signals."""
         if not self._project_signals_connected:
             return
 
@@ -226,4 +305,5 @@ class Console:
         self._project_signals_connected = False
 
     def _set_state(self, state):
+        """Changes the internal state of the R session."""
         self._state = state

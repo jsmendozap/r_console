@@ -1,5 +1,10 @@
 # R Console
 
+![Status](https://img.shields.io/badge/Status-Experimental-orange.svg)
+![Version](https://img.shields.io/badge/Version-0.1.0-blue.svg)
+![QGIS](https://img.shields.io/badge/QGIS-3.30%2B-brightgreen.svg)
+![License](https://img.shields.io/badge/License-GPL%20v2-green.svg)
+
 An R console integrated into QGIS as a dock widget. Write and execute R code directly inside QGIS while having full access to the active project's layers, CRS, extent, and other properties from R.
 
 ## Features
@@ -150,4 +155,10 @@ qgis$get_selected_features()
 
 ## License
 
-GNU General Public License v2 or later. See [LICENSE](LICENSE) for details.
+Copyright (C) 2024 Juan Mendoza.
+
+R Console is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 2 of the License, or (at your option) any later version.
+
+R Console is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with R Console. If not, see <https://www.gnu.org/licenses/>.

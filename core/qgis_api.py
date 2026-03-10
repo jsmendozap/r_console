@@ -10,7 +10,20 @@ import tempfile
 import os
 
 class QGISApi(QObject):
+    """
+    Exposes QGIS functionalities to be called from the R process.
+
+    This class acts as a server, receiving requests via the `dispatch` slot,
+    executing the corresponding QGIS action, and returning the result.
+    It handles layer operations, project state, and temporary file management.
+    """
     def __init__(self, iface):
+        """
+        Initializes the QGISApi.
+
+        Args:
+            iface: The QgisInterface instance.
+        """
         super().__init__()
         self.result = None
         self.needs_update = False
@@ -19,6 +32,17 @@ class QGISApi(QObject):
 
     @pyqtSlot('PyQt_PyObject', result='PyQt_PyObject')
     def dispatch(self, msg):
+        """
+        Main entry point for requests from R.
+
+        Parses the request message and routes it to the appropriate handler method.
+
+        Args:
+            msg (dict): A dictionary containing 'method' and 'args' for the request.
+
+        Returns:
+            dict: A dictionary with the response to be sent back to R.
+        """
         method = msg.get('method')
         match method:
             case "list_layers":
@@ -42,6 +66,12 @@ class QGISApi(QObject):
     
     @pyqtSlot(result='PyQt_PyObject')
     def project_state(self):
+        """
+        Retrieves the current state of the QGIS project.
+
+        Returns:
+            dict: A dictionary with project title, path, CRS, and map units.
+        """
         project = QgsProject.instance()
         result = {
             "type": "response",
@@ -53,6 +83,16 @@ class QGISApi(QObject):
         return result
 
     def list_layers(self, args):
+        """
+        Lists layers in the current QGIS project.
+
+        Args:
+            args (dict): A dictionary that may contain a 'type' filter
+                         (0 for vector, 1 for raster).
+
+        Returns:
+            dict: A response containing a list of layers (name, id, type).
+        """
         type = args.get("type")
         
         if type is not None:
@@ -67,6 +107,18 @@ class QGISApi(QObject):
         }
 
     def get_layer(self, args):
+        """
+        Exports a QGIS layer to a temporary file.
+
+        The layer is identified by its name or ID. Vector layers are saved as
+        FlatGeobuf (.fgb) and rasters as GeoTIFF (.tif).
+
+        Args:
+            args (dict): A dictionary with 'col' ('name' or 'id') and 'value'.
+
+        Returns:
+            dict: A response containing the path to the temporary file or an error.
+        """
         column = args.get("col")
         field = args.get("value")
         
@@ -100,6 +152,15 @@ class QGISApi(QObject):
         return {"type": "response", "path": path}
     
     def insert_layer(self, args):
+        """
+        Inserts a spatial file into QGIS as a new layer.
+
+        Args:
+            args (dict): A dictionary with 'path' to the file and an optional 'name'.
+
+        Returns:
+            dict: A response containing the new layer's ID or an error.
+        """
         path = args.get("path")
         if not os.path.exists(path):
             return {"type": "error", "error": f"Layer not found: {path}"}
@@ -126,6 +187,12 @@ class QGISApi(QObject):
         return {"type": "response", "id": layer.id()}
     
     def get_canvas_extent(self):
+        """
+        Gets the extent of the current map canvas view.
+
+        Returns:
+            dict: A response with the extent as a WKT polygon and its CRS.
+        """
         response = {
             "type": "response",
             "wkt": self.iface.mapCanvas().extent().asWktPolygon(), 
@@ -134,6 +201,13 @@ class QGISApi(QObject):
         return response
 
     def get_selected_features(self):
+        """
+        Exports selected features from the active vector layer.
+
+        Returns:
+            dict: A response containing the path to a temporary file with the
+                  selected features, or an error.
+        """
         layer = self.iface.activeLayer()
         
         if layer is None:
@@ -160,6 +234,15 @@ class QGISApi(QObject):
 
     @pyqtSlot(result='PyQt_PyObject')
     def get_layer_info(self, args):
+        """
+        Retrieves detailed metadata for a specific layer.
+
+        Args:
+            args (dict): A dictionary with 'column' ('name' or 'id') and 'value'.
+
+        Returns:
+            dict: A response with detailed layer information or an error.
+        """
         column = args.get("column")
         field = args.get("value")
         
@@ -204,10 +287,15 @@ class QGISApi(QObject):
         return info
 
     def update_state(self):
+        """Flags that the project state has changed and needs to be sent to R."""
         self.needs_update = True
 
     @pyqtSlot(result='PyQt_PyObject')
     def check_update(self):
+        """
+        Checks if a project update is pending and, if so, dispatches it.
+        This is called synchronously from the R bridge before running code.
+        """
         if not self.needs_update:
             self.result = None
             return None
@@ -215,6 +303,7 @@ class QGISApi(QObject):
         self.dispatch({"method": "project_state", "args": None})
     
     def remove_temp_files(self):
+        """Removes all temporary files created during the session."""
         for path in self._temp_files:
             if os.path.exists(path):
                 os.remove(path)

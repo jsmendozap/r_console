@@ -1,9 +1,16 @@
+"""Manages the R execution thread to keep the QGIS UI responsive."""
 from qgis.PyQt.QtCore import QObject, QThread, pyqtSignal, pyqtSlot, QMetaObject, Qt
 from .utils import MissingDependencyError, RPathRequiredError
-from .r_bridge import RBridge 
+from .bridge import RBridge 
 
 
 class RWorker(QObject):
+    """
+    A worker object that runs in a separate thread to handle R communication.
+
+    It owns the RBridge and performs all blocking operations, communicating
+    with the main GUI thread via Qt signals and slots.
+    """
     initialized = pyqtSignal()        
     line_result = pyqtSignal(str, dict)  
     welcome_result = pyqtSignal(dict)
@@ -14,12 +21,22 @@ class RWorker(QObject):
     pkg_loaded = pyqtSignal(list)
 
     def __init__(self, qgis_api):
+        """
+        Initializes the RWorker.
+
+        Args:
+            qgis_api: The QGISApi instance for the R bridge to use.
+        """
         super().__init__()
         self.bridge = None
         self.qgis_api = qgis_api
 
     @pyqtSlot()
     def initialize(self):
+        """
+        Slot to initialize the R bridge. Emits 'initialized' on success or
+        'path_required'/'failed' on error.
+        """
         try:
             self.bridge = RBridge(self.qgis_api, self._on_pkg_loaded)
             self.bridge.initialize()
@@ -36,6 +53,16 @@ class RWorker(QObject):
 
     @pyqtSlot(str, int)
     def run_code_block(self, code, width):
+        """
+        Slot to execute a block of R code.
+
+        Iterates through the results from the bridge and emits signals for each
+        piece of output.
+
+        Args:
+            code (str): The R code to run.
+            width (int): The console width for formatting.
+        """
         if self.bridge is None:
             self.failed.emit("R bridge is not initialized.")
             self.run_finished.emit()
@@ -58,6 +85,12 @@ class RWorker(QObject):
 
     @pyqtSlot(int)
     def run_welcome(self, width):
+        """
+        Slot to run the welcome script and emit the result.
+
+        Args:
+            width (int): The console width.
+        """
         if self.bridge is None:
             return
         try:
@@ -68,6 +101,7 @@ class RWorker(QObject):
 
     @pyqtSlot()
     def restart_r(self):
+        """Slot to restart the R process."""
         if self.bridge:
             try:
                 self.bridge.restart()
@@ -77,6 +111,7 @@ class RWorker(QObject):
 
     @pyqtSlot()
     def shutdown(self):
+        """Slot to gracefully stop the R bridge."""
         try:
             if self.bridge is not None:
                 self.bridge.stop()
@@ -87,6 +122,12 @@ class RWorker(QObject):
 
     @pyqtSlot(str)
     def change_wd(self, path):
+        """
+        Slot to change the working directory in the R process.
+
+        Args:
+            path (str): The new working directory path.
+        """
         if self.bridge:
             try:
                 path = path.replace('\\', '/').replace('"', '\\"')
@@ -96,10 +137,23 @@ class RWorker(QObject):
                 self.failed.emit(f"Failed to change working directory: {e}")
 
     def _on_pkg_loaded(self, signatures):
+        """
+        Callback for when the R bridge reports a package has been loaded.
+
+        Args:
+            signatures (list): A list of function signatures from the loaded package.
+        """
         self.pkg_loaded.emit(signatures)
 
 
 class RRunner(QObject):
+    """
+    Manages the RWorker and its QThread, providing a clean API for the GUI.
+
+    This class is the main entry point for the GUI to interact with the R
+    process. It forwards requests to the RWorker in the background thread
+    and connects the worker's signals to the appropriate slots in the GUI.
+    """
     initialized = pyqtSignal()
     line_result = pyqtSignal(str, dict)
     welcome_result = pyqtSignal(dict)
@@ -115,6 +169,12 @@ class RRunner(QObject):
     pkg_loaded = pyqtSignal(list)
 
     def __init__(self, qgis_api):
+        """
+        Initializes the RRunner, creating and starting the background thread.
+
+        Args:
+            qgis_api: The QGISApi instance to be passed to the worker.
+        """
         super().__init__()
         self._thread = QThread()
         self._worker = RWorker(qgis_api)
@@ -124,18 +184,34 @@ class RRunner(QObject):
         self._thread.start()
 
     def initialize(self):
+        """Requests the worker to initialize the R bridge."""
         self.request_initialize.emit()
 
     def run(self, code, width):
+        """
+        Requests the worker to run a block of R code.
+
+        Args:
+            code (str): The R code to run.
+            width (int): The console width.
+        """
         self.request_run.emit(code, width)
 
     def welcome_message(self, width):
+        """
+        Requests the worker to run the welcome script.
+
+        Args:
+            width (int): The console width.
+        """
         self.request_welcome.emit(width)
 
     def restart_r(self):
+        """Requests the worker to restart the R process."""
         self.request_restart.emit()
 
     def stop(self):
+        """Stops the worker and waits for the thread to terminate."""
         QMetaObject.invokeMethod(
             self._worker,
             "shutdown",
@@ -145,9 +221,16 @@ class RRunner(QObject):
         self._thread.wait()
 
     def change_wd(self, path):
+        """
+        Requests the worker to change the R working directory.
+
+        Args:
+            path (str): The new path.
+        """
         self.request_change_wd.emit(path)
 
     def _connect_woker_signals(self):
+        """Connects signals from the worker to this object's signals."""
         self._worker.initialized.connect(self.initialized)
         self._worker.path_required.connect(self.path_required)
         self._worker.line_result.connect(self.line_result)
@@ -158,6 +241,7 @@ class RRunner(QObject):
         self._worker.pkg_loaded.connect(self.pkg_loaded)
 
     def _connect_request_signals(self):
+        """Connects this object's request signals to the worker's slots."""
         self.request_initialize.connect(self._worker.initialize)
         self.request_run.connect(self._worker.run_code_block)
         self.request_welcome.connect(self._worker.run_welcome)

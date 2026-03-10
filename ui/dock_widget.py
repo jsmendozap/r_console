@@ -15,6 +15,14 @@ from ..core import plugin_settings
 
 
 class RDockWidget(QDockWidget):
+    """
+    The main dock widget for the R Console.
+
+    This widget contains the UI elements, including the script editor tabs and
+    the console output area. It emits signals based on user actions (e.g.,
+    clicking "Run", typing in the console), which are handled by the `Console`
+    controller class.
+    """
     runRequested = pyqtSignal(str)
     executionStateChanged = pyqtSignal(bool)
     restartRequested = pyqtSignal(str)
@@ -36,6 +44,14 @@ class RDockWidget(QDockWidget):
         self.set_running_state(False)
         
     def set_console_header(self, new_path = None, emit = True):
+        """
+        Updates the working directory path displayed in the console header.
+
+        Args:
+            new_path (str, optional): The new path to display. Defaults to the
+                                      current `self.wd`.
+            emit (bool): If True, emits the `changeWd` signal.
+        """
         if new_path is None:
             new_path = self.wd
 
@@ -52,6 +68,12 @@ class RDockWidget(QDockWidget):
             self.changeWd.emit(self.wd)
 
     def set_running_state(self, is_running):
+        """
+        Updates the UI to reflect the execution state (running or ready).
+
+        Args:
+            is_running (bool): True if R code is currently executing.
+        """
         self.run_button.setEnabled(not is_running)
         self.console.setReadOnly(is_running)
 
@@ -63,6 +85,13 @@ class RDockWidget(QDockWidget):
             self.state.setToolTip("Ready")
 
     def append_result(self, line, result):
+        """
+        Appends the result of a code execution to the console widget.
+
+        Args:
+            line (str): The code that was executed.
+            result (dict): The result object from the R process.
+        """
 
         line = "" if self._from_console else line
         self.console.add_to_console(line, result)
@@ -74,6 +103,12 @@ class RDockWidget(QDockWidget):
         self._from_console = False
 
     def append_welcome(self, result):
+        """
+        Appends the initial welcome message to the console.
+
+        Args:
+            result (dict): The welcome message result from the R process.
+        """
         self.console.moveCursor(QTextCursor.End)
         self.console.moveCursor(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)
         if self.console.textCursor().selectedText().strip() == self.console.prompt.strip():
@@ -86,25 +121,34 @@ class RDockWidget(QDockWidget):
         self.set_console_header(result.get("wd"))
 
     def clean_console(self, prompt):
+        """Clears the console widget."""
         self.console.clean(prompt)
 
     def new_console_prompt(self):
+        """Adds a new, empty prompt line to the console."""
         self.console.new_line()
         if self._from_console:
             self.console.setFocus()
 
     def console_width(self):
+        """Returns the approximate width of the console in characters."""
         return self.console.width_cols
     
     def on_pkg_loaded(self, signatures):
+        """
+        Updates the editor's autocompleter with new function signatures.
+
+        Args:
+            signatures (list): A list of function signatures from a newly loaded package.
+        """
         self.editor_tabs.update_signatures(signatures)
 
     def closeEvent(self, event):
+        """Emits the `closing` signal when the widget is closed by the user."""
         self.closing.emit()
         super().closeEvent(event)
 
     def _build_header(self):
-
         self.save_button = QToolButton()
         self.save_button.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.save_button.setToolTip("Save script")
@@ -134,6 +178,7 @@ class RDockWidget(QDockWidget):
         self.wd_button.setToolTip("Change working directory")
 
     def _build_editor_area(self):
+        """Constructs the editor tabs and their associated buttons."""
         self.editor_tabs = EditorTabsWidget(self)
 
         corner_editor = QWidget()
@@ -146,7 +191,7 @@ class RDockWidget(QDockWidget):
         self.editor_tabs.setCornerWidget(corner_editor, Qt.TopRightCorner)
 
     def _build_console_area(self):
-        # output_tabs + history + repl + console_tab/layout
+        """Constructs the console output area, including its header and styling."""
         self.output_tabs = QTabWidget()
         
         corner_console = QWidget()
@@ -214,6 +259,7 @@ class RDockWidget(QDockWidget):
         """)
 
     def _set_state_icon(self, is_running):
+        """Sets the small status icon (running/ready) in the console header."""
         if is_running:
             icon = QIcon.fromTheme("media-playback-stop", self.style().standardIcon(QStyle.SP_DialogNoButton))
         else:
@@ -223,7 +269,7 @@ class RDockWidget(QDockWidget):
         self.state.setPixmap(pm)    
         
     def _build_main_layout(self):
-        # container, top_bar, splitter, setWidget
+        """Constructs the main layout of the dock widget using a splitter."""
         container = QWidget()
         self.setWidget(container)
 
@@ -237,6 +283,7 @@ class RDockWidget(QDockWidget):
         layout.addWidget(splitter)
 
     def _connect_signals(self):
+        """Connects UI element signals to internal slots or emits signals."""
         self.run_button.clicked.connect(lambda: self._emit_run(True))
         self.settings_button.clicked.connect(self.settings.show)
         self.clear_button.clicked.connect(lambda: self.console.clean(True))
@@ -249,11 +296,13 @@ class RDockWidget(QDockWidget):
         self._register_shortcuts()
 
     def _on_change_wd(self):
+        """Opens a dialog to let the user select a new working directory."""
         path = QFileDialog.getExistingDirectory(self, "Change working directory")
         if path:
             self.set_console_header(path)
 
     def _register_shortcuts(self):
+        """Registers keyboard shortcuts for the widget."""
         run_ctrl = QShortcut(QKeySequence("Ctrl+Return"), self)
         run_ctrl.activated.connect(self._emit_run)
         self._shortcuts.append(run_ctrl)
@@ -266,6 +315,12 @@ class RDockWidget(QDockWidget):
         self.console.register_shortcuts()
         
     def _emit_run(self, run_all=False):
+        """
+        Determines which code to run from the editor and emits `runRequested`.
+
+        It runs the selected text, the entire script, or the expression at the
+        cursor's current position.
+        """
         focused = QApplication.focusWidget()
         if isinstance(focused, RConsole):
             return
@@ -285,10 +340,12 @@ class RDockWidget(QDockWidget):
         self.runRequested.emit(code)
 
     def _on_console_run(self, code):
+        """Handles code submitted directly from the console input."""
         self._from_console = True
         self.runRequested.emit(code)
 
     def _expression_at_cursor(self, editor):
+        """Finds the complete R expression surrounding the editor's cursor."""
         line, _ = editor.getCursorPosition()
         full_code = editor.text()
         lines = full_code.splitlines()

@@ -84,7 +84,7 @@ QgisProject <- R6Class("QgisProject",
                         public = list(
                           #' @description
                           #' Create a new `QgisProject` object.
-                          #' This is typically done automatically by the plugin.
+                          #' This is typically instantiated via qgis_project().
                           #' @param data A list containing the initial project state.
                           #' If `NULL`, it will be requested from QGIS. For internal use.
                           #' @return A new `QgisProject` object.
