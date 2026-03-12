@@ -1,4 +1,4 @@
-from .console import Console
+from .main import Console
 
 def classFactory(iface):
     return Console(iface)

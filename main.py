@@ -6,7 +6,7 @@ from qgis.PyQt.QtCore import Qt
 from enum import Enum, auto
 import os
 
-from .ui.dock_widget import RDockWidget
+from .ui.dock import RDockWidget
 from .core.thread import RRunner
 from .core.qgis_api import QGISApi
 from .core import plugin_settings

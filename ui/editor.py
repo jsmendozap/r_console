@@ -1,5 +1,5 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal
-from qgis.PyQt.QtGui import QColor, QKeySequence, QFont
+from qgis.PyQt.QtGui import QColor, QKeySequence
 from qgis.PyQt.QtWidgets import QFrame, QTabWidget, QWidget, QFileDialog, QTabBar, QMessageBox, QShortcut
 from qgis.PyQt.Qsci import QsciScintilla, QsciAPIs
 from qgis.gui import QgsCodeEditorR
@@ -26,7 +26,6 @@ class EditorTab(QgsCodeEditorR):
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._handle_enter(event)
             return
-
         super().keyPressEvent(event)
         self._handle_autocomplete(event.text())
 
@@ -56,7 +55,7 @@ class EditorTab(QgsCodeEditorR):
         self.api.prepare()
 
     def _setup_autocomplete(self, accumulated=None):
-        self._force_colors_lexer()
+        self.setAutoIndent(False)
         self.setAutoCompletionSource(QsciScintilla.AcsAPIs)
         self.setAutoCompletionThreshold(2)
         self.setAutoCompletionUseSingle(QsciScintilla.AcusNever)
@@ -80,21 +79,22 @@ class EditorTab(QgsCodeEditorR):
             super().keyPressEvent(event)
             return
 
-        line, _ = self.getCursorPosition()
-        line_text = self.text(line).rstrip()
-        is_pipe = line_text.endswith(("%>%", "|>", "+"))
-        is_open = line_text.endswith(("{", "(", "["))
+        line, col = self.getCursorPosition()
+        text_up_to_cursor = self.text(line)[:col].rstrip()
+        
+        is_pipe = text_up_to_cursor.endswith(("%>%", "|>", "+"))
+        is_open = text_up_to_cursor.endswith(("{", "(", "["))
         prev_is_pipe = line > 0 and self.text(line - 1).rstrip().endswith(("%>%", "|>", "+"))
         current_indent = self.indentation(line)
 
-        super().keyPressEvent(event)  # inserta el salto de línea
+        self.SendScintilla(self.SCI_NEWLINE)
 
         if is_open or (is_pipe and not prev_is_pipe):
             new_indent = current_indent + self.tabWidth()
         elif not is_pipe and prev_is_pipe:
             new_indent = max(0, current_indent - self.tabWidth())
         else:
-            new_indent = current_indent  # replica indentación actual, caso base
+            new_indent = current_indent
 
         self.setIndentation(line + 1, new_indent)
         self.setCursorPosition(line + 1, new_indent)
@@ -129,44 +129,6 @@ class EditorTab(QgsCodeEditorR):
                     self.SendScintilla(self.SCI_GETCURRENTPOS),
                     encoded)
                 break
-
-    def _force_colors_lexer(self):
-        lexer = self.lexer()
-        
-        if not lexer:
-            print("Error: QgsCodeEditorR no inicializó un lexer base.")
-            return
-
-        fuente = QFont("Monospace", 10)
-        lexer.setDefaultFont(fuente)
-
-        is_dark_theme = self.paper().lightness() < 128
-
-        general   = QColor("#D4D4D4") if is_dark_theme else QColor("#000000")  
-        keywords  = QColor("#569CD6") if is_dark_theme else QColor("#3A3AC3")  
-        strings   = QColor("#CE9178") if is_dark_theme else QColor("#2e7d32")  
-        numbers   = QColor("#B5CEA8") if is_dark_theme else QColor("#098658")  
-        comments  = QColor("#6A9955") if is_dark_theme else QColor("#A6AAA6")  
-        operators = QColor("#569CD6") if is_dark_theme else QColor("#6A6A6D")  
-
-        lexer.setColor(general,   0)   # Default
-        lexer.setColor(comments,  1)   # Comment
-        lexer.setColor(keywords,  2)   # Keyword - for, while, if
-        lexer.setColor(general,   3)   # Base Keyword - print, mean
-        lexer.setColor(general,   4)   # Other Keyword
-        lexer.setColor(numbers,   5)   # Number
-        lexer.setColor(strings,   6)   # String
-        lexer.setColor(strings,   7)   # String 2
-        lexer.setColor(operators, 8)   # Operator
-        lexer.setColor(general,   9)   # Identifier - variables, mutate
-        lexer.setColor(operators, 10)  # Infix - %in%, %>%
-        lexer.setColor(operators, 11)  # Infix EOL
-        lexer.setColor(strings,   12)  # Backticks
-        lexer.setColor(strings,   13)  # Raw String
-        lexer.setColor(strings,   14)  # Raw String 2
-        lexer.setColor(strings,   15)  # Escape Sequence
-
-        self.setLexer(lexer)
 
 class EditorTabsWidget(QTabWidget):
     def __init__(self, parent=None):

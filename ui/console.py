@@ -1,7 +1,6 @@
 from qgis.PyQt.QtCore import Qt, pyqtSignal
-from qgis.PyQt.QtGui import QFont, QTextCursor, QKeySequence, QTextCharFormat
+from qgis.PyQt.QtGui import QFont, QTextCursor, QKeySequence, QColor
 from qgis.PyQt.QtWidgets import QTextEdit, QShortcut
-from .highlighter import RHighlighter
 import html
 
 
@@ -22,7 +21,6 @@ class RConsole(QTextEdit):
         font.setStyleHint(QFont.TypeWriter)
         self.setFont(font)
 
-        self._highlighter = RHighlighter(self.document())
         self.selectionChanged.connect(self._clamp_selection)
 
     def register_shortcuts(self):
@@ -61,6 +59,7 @@ class RConsole(QTextEdit):
             self.insertPlainText(self.prompt)
 
     def new_line(self):
+        self.setTextColor(QColor("#1D1DC3"))
         self.append(self.prompt)
         self.moveCursor(QTextCursor.End)
 
