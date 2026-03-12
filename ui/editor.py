@@ -85,22 +85,16 @@ class EditorTab(QgsCodeEditorR):
         is_pipe = line_text.endswith(("%>%", "|>", "+"))
         is_open = line_text.endswith(("{", "(", "["))
         prev_is_pipe = line > 0 and self.text(line - 1).rstrip().endswith(("%>%", "|>", "+"))
-
-        super().keyPressEvent(event)
-
         current_indent = self.indentation(line)
+
+        super().keyPressEvent(event)  # inserta el salto de línea
 
         if is_open or (is_pipe and not prev_is_pipe):
             new_indent = current_indent + self.tabWidth()
         elif not is_pipe and prev_is_pipe:
             new_indent = max(0, current_indent - self.tabWidth())
-        elif not is_pipe and not prev_is_pipe:
-            start = line
-            while start > 0 and self.text(start - 1).rstrip().endswith(("%>%", "|>", "+")):
-                start -= 1
-            new_indent = min(current_indent, self.indentation(start))
         else:
-            new_indent = current_indent
+            new_indent = current_indent  # replica indentación actual, caso base
 
         self.setIndentation(line + 1, new_indent)
         self.setCursorPosition(line + 1, new_indent)

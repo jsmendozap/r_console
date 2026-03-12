@@ -211,16 +211,13 @@ class QGISApi(QObject):
         layer = self.iface.activeLayer()
         
         if layer is None:
-            self.result = {"type": "response", "error": "No active layer"}
-            return
+            return {"type": "response", "error": "No active layer"}
         
         if not hasattr(layer, 'selectedFeatureCount'):
-            self.result = {"type": "response", "error": "Active layer is not a vector layer"}
-            return
+            return {"type": "response", "error": "Active layer is not a vector layer"}
         
         if layer.selectedFeatureCount() == 0:
-            self.result = {"type": "response", "error": "No features selected"}
-            return
+            return {"type": "response", "error": "No features selected"}
 
         path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")        
         processing.run("native:savefeatures", {

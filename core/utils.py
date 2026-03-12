@@ -1,16 +1,24 @@
-from subprocess import run
+import subprocess
 import os
 
 def is_valid_rscript(path):
+        path = os.path.normpath(path.replace('\\', '/'))
         path = os.path.realpath(path)
-        if not os.path.isfile(path) or not os.access(path, os.X_OK):
+
+        if not os.path.isfile(path):
             return False
+        
+        kwargs = {}
+        if os.name == 'nt':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
         try:
-            result = run(
+            result = subprocess.run(
                 [path, '-e', 'R.version.string'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                **kwargs
             )
             output = result.stdout + result.stderr
             return 'R version' in output

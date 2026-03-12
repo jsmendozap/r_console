@@ -152,14 +152,17 @@ class RBridge:
         else:
             args.extend([f"{worker}", f"{self.plugin_dir}"])
         
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+        creationflags = 0
+        if os.name == 'nt':
+            creationflags = subprocess.CREATE_NO_WINDOW | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
 
         process = subprocess.Popen(
             args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
-            bufsize=1,
+            encoding='utf-8',
+            bufsize=0,
             cwd=self.plugin_dir, 
             creationflags=creationflags
         )
