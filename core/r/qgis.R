@@ -187,7 +187,7 @@ QgisProject <- R6Class("QgisProject",
                             }
 
                             column <- if (private$.is_id(x)) "id" else "name"
-                            response <- private$.send_request("layer_info", list(column = column, value = x))
+                            response <- private$.send_request("layer_info", list(col = column, value = x))
                                                     
                             cat(paste0("<Layer: ", response$name, ">"), "\n")
                             cat("@ Type:", response$layer_type, "\n")

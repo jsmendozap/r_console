@@ -298,7 +298,7 @@ class QGISApi(QObject):
 
     def _resolve_layer(self, args):
         """Returns QgsMapLayer or an error dict."""
-        col = args.get("column")
+        col = args.get("col")
         value = args.get("value")
 
         if col == "name":

@@ -91,8 +91,9 @@ Perform any analysis in R and push the results back to QGIS as a new layer.
 ```r
 library(sf)
 library(rnaturalearth)
+library(dplyr)
 
-world <- ne_countries()
+world <- ne_countries() %>% select(name, continent)
 
 # Insert the new layer into QGIS
 qgis$insert_layer(world, name = "world")
@@ -125,14 +126,8 @@ qgis$layer_info("world")
 # @ Geometry: MultiPolygon 
 # @ Features: 177 
 # @ Fields:
-#     featurecla
-#     scalerank
-#     labelrank
-#     sovereignt
-#     sov_a3
-#     adm0_dif
-#     level
-#     ...
+#     name
+#     continent
 ```
 
 #### Canvas extent
