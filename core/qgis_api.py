@@ -60,7 +60,7 @@ class QGISApi(QObject):
             case "selected_features":
                 self.result = self.get_selected_features()
             case _:
-                self.result = {"type": "response", "error": f"Unknown method: {method}"}
+                self.result = {"type": "error", "error": f"Unknown method: {method}"}
         
         return self.result
     
@@ -119,32 +119,27 @@ class QGISApi(QObject):
         Returns:
             dict: A response containing the path to the temporary file or an error.
         """
-        column = args.get("col")
-        field = args.get("value")
         
-        if column == "name":
-            layer = QgsProject.instance().mapLayersByName(field)
-            if not layer:
-                return {"type": "error", "error": f"Layer not found: {field}"}
-            layer = layer[0]
-        elif column == "id":
-            layer = QgsProject.instance().mapLayer(field)
-            if layer is None:
-                return {"type": "error", "error": f"Layer not found: {field}"}
-        else: 
-            result = {"type": "error", "error": f"Unknown layer: {column}"}
-            return result
-
+        layer = self._resolve_layer(args)
+        if isinstance(layer, dict):
+            return layer
+        
         if layer.providerType() in ("wms", "bing", "xyz"):
-            return {"type": "response", "error": f"Layer '{field}' is a base map and cannot be exported"}
+            return {"type": "error", "error": "Layer is a base map and cannot be exported"}
 
         type = layer.type()
         if type == QgsMapLayer.VectorLayer:
             path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")
-            processing.run("native:savefeatures", {'INPUT': layer, 'OUTPUT': path})
+            try: 
+                processing.run("native:savefeatures", {'INPUT': layer, 'OUTPUT': path})
+            except Exception as e: 
+                return {"type": "error", "error": f"Failed to save layer: {e}"}
         elif type == QgsMapLayer.RasterLayer:
             path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.tif")
-            processing.run("gdal:translate", {'INPUT': layer, 'OUTPUT': path, 'OPTIONS': ''})
+            try: 
+                processing.run("gdal:translate", {'INPUT': layer, 'OUTPUT': path, 'OPTIONS': ''})
+            except Exception as e: 
+                return {"type": "error", "error": f"Failed to save layer: {e}"}
         else:
             return {"type": "error", "error": f"Unsupported layer type: {type}"}
 
@@ -211,19 +206,22 @@ class QGISApi(QObject):
         layer = self.iface.activeLayer()
         
         if layer is None:
-            return {"type": "response", "error": "No active layer"}
+            return {"type": "error", "error": "No active layer"}
         
         if not hasattr(layer, 'selectedFeatureCount'):
-            return {"type": "response", "error": "Active layer is not a vector layer"}
+            return {"type": "error", "error": "Active layer is not a vector layer"}
         
         if layer.selectedFeatureCount() == 0:
-            return {"type": "response", "error": "No features selected"}
+            return {"type": "error", "error": "No features selected"}
 
-        path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")        
-        processing.run("native:savefeatures", {
-            'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True),
-            'OUTPUT': path
-        })
+        path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.fgb")
+        try:        
+            processing.run("native:savefeatures", {
+                'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True),
+                'OUTPUT': path
+            })
+        except Exception as e:
+            return {"type": "error", "error": f"Failed to save features: {e}"}
         
         self._temp_files.append(path)
 
@@ -240,18 +238,10 @@ class QGISApi(QObject):
         Returns:
             dict: A response with detailed layer information or an error.
         """
-        column = args.get("column")
-        field = args.get("value")
         
-        if column == "name":
-            layer = QgsProject.instance().mapLayersByName(field)
-            if not layer:
-                return {"type": "response", "error": "Layer not found"}
-            layer = layer[0]
-        else:
-            layer = QgsProject.instance().mapLayer(field)
-            if layer is None:
-                return {"type": "response", "error": "Layer not found"}
+        layer = self._resolve_layer(args)
+        if isinstance(layer, dict):
+            return layer
         
         info = {
             "type": "response",
@@ -305,3 +295,21 @@ class QGISApi(QObject):
             if os.path.exists(path):
                 os.remove(path)
         self._temp_files = []
+
+    def _resolve_layer(self, args):
+        """Returns QgsMapLayer or an error dict."""
+        col = args.get("column")
+        value = args.get("value")
+
+        if col == "name":
+            layers = QgsProject.instance().mapLayersByName(value)
+            if not layers:
+                return {"type": "error", "error": f"Layer not found: {value}"}
+            return layers[0]
+        if col == "id":
+            layer = QgsProject.instance().mapLayer(value)
+            if layer is None:
+                return {"type": "error", "error": f"Layer not found: {value}"}
+            return layer
+        
+        return {"type": "error", "error": f"Unknown column: {col}"}

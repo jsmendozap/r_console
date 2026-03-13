@@ -170,7 +170,7 @@ class RBridge:
         ready = process.stdout.readline().strip()
         if ready != "READY":
             process.kill()
-            raise RuntimeError(f"Failed to start R worker process.")
+            raise RuntimeError(f"Failed to start R worker process. Error: {ready}")
         
         return process     
     

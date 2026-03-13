@@ -37,6 +37,7 @@ class RConsole(QTextEdit):
                 cursor.removeSelectedText()
                 cursor.insertText(self.prompt + line)
             else:
+                self.setTextColor(QColor("#1D1DC3"))
                 self.append(self.prompt + line)
 
             if "\n" not in line:

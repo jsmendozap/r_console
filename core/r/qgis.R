@@ -54,7 +54,10 @@ QgisProject <- R6Class("QgisProject",
                             cat(msg, "\n", file = .out, sep = "")
                             flush(.out)
                             
-                            fromJSON(readLines("stdin", n = 1, warn = FALSE))
+                            response <- fromJSON(readLines("stdin", n = 1, warn = FALSE))
+                            if (response$type == "error") stop(response$error, call. = FALSE)
+
+                            return(response) 
                           }, 
 
                           .is_id = function(x) {
@@ -185,8 +188,6 @@ QgisProject <- R6Class("QgisProject",
 
                             column <- if (private$.is_id(x)) "id" else "name"
                             response <- private$.send_request("layer_info", list(column = column, value = x))
-
-                            if (!is.null(response$error)) stop(response$error, call. = FALSE)
                                                     
                             cat(paste0("<Layer: ", response$name, ">"), "\n")
                             cat("@ Type:", response$layer_type, "\n")
@@ -228,7 +229,6 @@ QgisProject <- R6Class("QgisProject",
                           #' selection.
                           get_selected_features = function() {
                             response <- private$.send_request("selected_features")
-                            if (!is.null(response$error)) stop(response$error, call. = FALSE)
                             layer <- st_read(response$path, quiet = TRUE)
                             return(layer)
                           },
