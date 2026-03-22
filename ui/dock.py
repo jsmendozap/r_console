@@ -11,8 +11,8 @@ from qgis.PyQt.QtGui import QTextCursor
 from .editor import EditorTabsWidget, EditorTab
 from .console import RConsole
 from .settings import RDockSettings
+from .help import HelpDialog
 from ..core import plugin_settings
-
 
 class RDockWidget(QDockWidget):
     """
@@ -142,6 +142,16 @@ class RDockWidget(QDockWidget):
             signatures (list): A list of function signatures from a newly loaded package.
         """
         self.editor_tabs.update_signatures(signatures)
+
+    def show_help_dialog(self, path):
+        """
+        Open a dialog window showing help for requested function
+
+        Args:
+            path (str): Path to help file to open
+        """
+        dialog = HelpDialog(path, self)
+        dialog.show()
 
     def closeEvent(self, event):
         """Emits the `closing` signal when the widget is closed by the user."""

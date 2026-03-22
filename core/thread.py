@@ -19,6 +19,7 @@ class RWorker(QObject):
     busy_changed = pyqtSignal(bool)
     path_required = pyqtSignal()
     pkg_loaded = pyqtSignal(list)
+    help_requested = pyqtSignal(str)
 
     def __init__(self, qgis_api):
         """
@@ -38,7 +39,7 @@ class RWorker(QObject):
         'path_required'/'failed' on error.
         """
         try:
-            self.bridge = RBridge(self.qgis_api, self._on_pkg_loaded)
+            self.bridge = RBridge(self.qgis_api, self._on_pkg_loaded, self._on_help_requested)
             self.bridge.initialize()
             self.initialized.emit()
         except RPathRequiredError:
@@ -145,6 +146,15 @@ class RWorker(QObject):
         """
         self.pkg_loaded.emit(signatures)
 
+    def _on_help_requested(self, path):
+        """
+        Callback for when the R bridge requests help.
+
+        Args:
+            path (str): The path to the html help file.
+        """
+        self.help_requested.emit(path)
+
 
 class RRunner(QObject):
     """
@@ -167,6 +177,7 @@ class RRunner(QObject):
     request_restart = pyqtSignal()
     request_change_wd = pyqtSignal(str)
     pkg_loaded = pyqtSignal(list)
+    help_requested = pyqtSignal(str)
 
     def __init__(self, qgis_api):
         """
@@ -239,6 +250,7 @@ class RRunner(QObject):
         self._worker.failed.connect(self.failed)
         self._worker.busy_changed.connect(self.busy_changed)
         self._worker.pkg_loaded.connect(self.pkg_loaded)
+        self._worker.help_requested.connect(self.help_requested)
 
     def _connect_request_signals(self):
         """Connects this object's request signals to the worker's slots."""

@@ -10,7 +10,7 @@ import os
 class RBridge:
     """Handles the lifecycle and communication with the R subprocess."""
 
-    def __init__(self, qgis_api, on_pkg_loaded):
+    def __init__(self, qgis_api, on_pkg_loaded, on_help_requested):
         """
         Initializes the RBridge.
 
@@ -24,6 +24,7 @@ class RBridge:
         self.qgis_api = qgis_api
         self.r = self._find_rscript()
         self.pkg_loaded = on_pkg_loaded
+        self.help_requested = on_help_requested
 
     def initialize(self):
         """Starts the R subprocess and sets the initial working directory."""
@@ -82,6 +83,11 @@ class RBridge:
 
             if result.is_pkg:
                 self.pkg_loaded(result.signatures)
+                continue
+
+            if result.is_help:
+                self.help_requested(result.path)
+                continue
 
             yield result
             if result.is_done:

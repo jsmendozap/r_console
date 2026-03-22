@@ -26,6 +26,15 @@ send_fns <- function(pkgs) {
     flush(.out)
 }
 
+send_help <- function(url) {
+    html_path <- paste0(url, ".html")
+    path <- tempfile(fileext = ".html")
+    tools::Rd2HTML(utils:::.getHelpFile(url), out = html_path)
+    msg <- toJSON(list(type = "help", path = html_path), auto_unbox = TRUE)
+    cat(msg, "\n", file = .out, sep = "")
+    flush(.out)
+}
+
 check_new_pkgs <- function(before) {
     new_pkgs <- setdiff(search(), before)
     pkgs <- gsub("^package:", "", new_pkgs[startsWith(new_pkgs, "package:")])

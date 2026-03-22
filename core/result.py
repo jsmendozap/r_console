@@ -24,9 +24,11 @@ class RResult(dict):
         self.is_done = False
         self.is_request = False
         self.is_pkg = False
+        self.is_help = False
         self.method = None
         self.args = None
         self.signatures = None
+        self.path = None
         self._parse(msg)
 
     def _parse(self, msg):
@@ -51,10 +53,6 @@ class RResult(dict):
                 self.wd = msg.get("wd")
                 self.is_done = True
                 self.update(stdout="", error=self.error, wd=self.wd)
-            case "error":
-                self.error = msg.get("data")
-                self.is_done = True
-                self.update(stdout="", error=self.error, wd=None)
             case "request":
                 self.method = msg["method"]
                 self.args = msg.get("args")
@@ -63,6 +61,9 @@ class RResult(dict):
             case "pkg":
                 self.signatures = msg['data']
                 self.is_pkg = True
+            case "help":
+                self.is_help = True
+                self.path = msg['path']
             case "missing":
                 raise MissingDependencyError(f"The following R packages are required but are not installed: {msg['data']}")
 

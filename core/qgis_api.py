@@ -143,7 +143,7 @@ class QGISApi(QObject):
         else:
             return {"type": "error", "error": f"Unsupported layer type: {type}"}
 
-        self._temp_files.append(path)
+        self.add_temp_file(path)
         return {"type": "response", "path": path}
     
     def insert_layer(self, args):
@@ -178,7 +178,7 @@ class QGISApi(QObject):
             return {"type": "error", "error": f"Invalid layer: {path}"}
         
         QgsProject.instance().addMapLayer(layer)
-        self._temp_files.append(path)
+        self.add_temp_file(path)
         return {"type": "response", "id": layer.id()}
     
     def get_canvas_extent(self):
@@ -223,7 +223,7 @@ class QGISApi(QObject):
         except Exception as e:
             return {"type": "error", "error": f"Failed to save features: {e}"}
         
-        self._temp_files.append(path)
+        self.add_temp_file(path)
 
         return {"type": "response", "path": path}
 
@@ -295,6 +295,9 @@ class QGISApi(QObject):
             if os.path.exists(path):
                 os.remove(path)
         self._temp_files = []
+
+    def add_temp_file(self, path):
+        self._temp_files.append(path)
 
     def _resolve_layer(self, args):
         """Returns QgsMapLayer or an error dict."""
