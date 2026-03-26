@@ -35,7 +35,14 @@ install.packages(c("R6", "jsonlite", "evaluate", "sf", "terra"))
 
 ## Installation
 
-Install the plugin manually by downloading the repository. Then, it can be installed from Plugins → Manage and Install plugins → Install from ZIP.
+The R Console plugin is available in the official QGIS Plugin Repository.
+
+1.  Open QGIS and go to **Plugins → Manage and Install Plugins...**.
+2.  Search for **"R Console"** in the `All` tab.
+3.  Select **R Console** from the list and click **Install Plugin**.
+
+> **Note**
+> The plugin is marked as experimental. If you cannot find it, go to the **Settings** tab in the plugin manager and make sure the **"Show also experimental plugins"** option is checked.
 
 ## Usage
 

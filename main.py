@@ -263,10 +263,15 @@ class Console:
 
         project = QgsProject.instance()
         self._project_signals = [
-            project.titleChanged,
             project.crsChanged,
             project.readProject,
         ]
+
+        if hasattr(project, 'titleChanged'):
+            self._project_signals.append(project.titleChanged)
+        else:
+            self._project_signals.append(project.metadataChanged)
+
         for signal in self._project_signals:
             signal.connect(self._on_project_changed)
         
