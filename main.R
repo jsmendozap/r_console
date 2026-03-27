@@ -1,6 +1,4 @@
 .plugin_dir <- commandArgs(trailingOnly = TRUE)
-
-options(echo = FALSE, max.print = 100)
 .out <- stdout()
 
 cat("READY\n")
@@ -25,6 +23,7 @@ local({
     source(file.path(.plugin_dir, "core", "r", "qgis.R"), local = TRUE)
     return(QgisProject$new(data))
 }
+
 attach(.qgis, pos = 2L, name = "qgis:utils", warn.conflicts = FALSE)
 source(file.path(.plugin_dir, "core", "r", "worker.R"), local = TRUE)
 

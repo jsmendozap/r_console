@@ -3,7 +3,7 @@ from qgis.core import (
     QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer,
     QgsVectorLayer, QgsWkbTypes, QgsProcessingFeatureSourceDefinition
 )
-
+from ..ui.user_interaction import QuestionDialog
 import processing
 import uuid
 import tempfile
@@ -59,6 +59,8 @@ class QGISApi(QObject):
                 self.result = self.get_canvas_extent()
             case "selected_features":
                 self.result = self.get_selected_features()
+            case "question":
+                self.result = self.question(msg.get("args", {}))
             case _:
                 self.result = {"type": "error", "error": f"Unknown method: {method}"}
         
@@ -299,6 +301,13 @@ class QGISApi(QObject):
     def add_temp_file(self, path):
         self._temp_files.append(path)
 
+    def question(self, msg):
+        method = msg.get("method")
+        args = msg.get("args")
+
+        result = QuestionDialog(self.iface.mainWindow(), method, args)
+        return result.dispatch()
+    
     def _resolve_layer(self, args):
         """Returns QgsMapLayer or an error dict."""
         col = args.get("col")

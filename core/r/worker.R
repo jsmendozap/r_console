@@ -2,6 +2,8 @@
 
     source(file.path("core", "r", "signatures.R"),  local = TRUE)
     source(file.path("core", "r", "utils.R"), local = TRUE)
+    source(file.path("core", "r", "protocol.R"), local = TRUE)
+    source(file.path("core", "r", "interactive.R"), local = TRUE)
 
     .fns <- NULL
 

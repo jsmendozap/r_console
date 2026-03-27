@@ -64,6 +64,11 @@ class RResult(dict):
             case "help":
                 self.is_help = True
                 self.path = msg['path']
+            case "question":
+                self.method = "question"
+                self.args = msg
+                self.is_request = True
+                self.is_done = False
             case "missing":
                 raise MissingDependencyError(f"The following R packages are required but are not installed: {msg['data']}")
 
