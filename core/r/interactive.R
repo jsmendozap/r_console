@@ -14,14 +14,19 @@
     return(response$data)
 }
 
-.editor <- function(name = NULL, file = NULL, title = NULL, ...) {
-    if (is.null(file) || file == "") file <- name
-    if (is.null(file) || file == "") return(invisible(0L))
+.editor <- function(name = NULL, file = "", title = NULL, remove_on_close = FALSE, ...) {
+    if (is.null(name) && is.character(file) == "") return(invisible(0L))
+    
+    if (!is.null(name)){
+        file <- tempfile(pattern = deparse(substitute(name)), fileext = ".R")
+        remove_on_close <- TRUE
+        write_file(name, file)
+    }
     
     file <- normalizePath(file, mustWork = FALSE)
     if (is.null(title)) title <- basename(file)
     
-    send_question("file_edit", list(file = file, title = title))
+    send_question("file_edit", list(file = file, title = title, remove_on_close = isTRUE(remove_on_close)))
     return(invisible(0L))
 }
 
@@ -31,26 +36,79 @@
     return(as.character(response$data))
 }
 
-.View <- function(x, title = NULL) {
+.View <- function(x, title = NULL, max_rows = 1000) {
     if (missing(title)) title <- deparse(substitute(x))[1]
     
     if (is.data.frame(x) || is.matrix(x)) {
-        max_rows <- 1000
+
+        if (class(x)[1] == "sf") {
+            x$geom <- sf::st_geometry_type(x)
+            x <- sf::st_drop_geometry(x)
+        }
+
         if (nrow(x) > max_rows) {
             x <- x[1:max_rows, , drop = FALSE]
             title <- paste0(title, " (Showing first ", max_rows, " rows)")
         }
         file <- tempfile(pattern = "View_", fileext = ".csv")
         write.csv(as.data.frame(x), file, row.names = FALSE)
-        send_question("show_table", list(file = file, title = title))
+        send_question("show_table", list(file = file, title = title, remove_on_close = TRUE))
         return(invisible(NULL))
+    }
+
+    if (is.list(x)) {
+        to_jsonable <- function(obj, depth) {
+            if (depth <= 0L) return("<max depth>")
+            if (is.null(obj) || is.atomic(obj)) return(obj)
+            if (is.data.frame(obj)) {
+                out <- lapply(obj, function(v) to_jsonable(v, depth - 1L))
+                if (!is.null(names(obj))) names(out) <- names(obj)
+                return(list(
+                    `__r_meta__` = list(
+                        type = "data.frame",
+                        value = paste(dim(obj), collapse = " x ")
+                    ),
+                    `__r_children__` = out
+                ))
+            }
+            if (is.list(obj)) {
+                out <- lapply(obj, function(v) to_jsonable(v, depth - 1L))
+                if (!is.null(names(obj))) names(out) <- names(obj)
+                return(out)
+            }
+            if (is.function(obj)) return("<function>")
+            if (is.environment(obj)) return("<environment>")
+            if (inherits(obj, "call") || inherits(obj, "formula") || inherits(obj, "language")) {
+                return(paste(deparse(obj), collapse = " "))
+            }
+            return(as.character(obj))
+        }
+
+        file <- tempfile(pattern = "View_", fileext = ".json")
+        ok <- tryCatch({
+            obj <- list(title = x)
+            names(obj) <- title
+            jsonlite::write_json(
+                to_jsonable(obj, depth = 5L),
+                file,
+                auto_unbox = TRUE,
+                null = "null",
+                na = "string"
+            )
+            TRUE
+        }, error = function(e) FALSE)
+
+        if (isTRUE(ok)) {
+            send_question("show_tree", list(file = file, title = title, remove_on_close = TRUE))
+            return(invisible(NULL))
+        }
     }
     
     file <- tempfile(pattern = "View_", fileext = ".R")
     sink(file)
-    print(x)
-    sink()
-    .editor(file = file, title = title)
+    on.exit(sink(), add = TRUE)
+    write_file(x, file)
+    .editor(file = file, title = title, remove_on_close = TRUE)
 }
 
 .patch_fn <- function(name, new_fn, pkg) {

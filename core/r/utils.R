@@ -39,3 +39,11 @@ inject_flush <- function(expr) {
 
     return(expr)
 }
+
+write_file <- function(x, file) {
+    lines <- deparse(x, width.cutoff = 500)
+    brace_idx <- which(trimws(lines) == "{")[1]
+    if (!is.na(brace_idx))
+        lines <- c(paste0(trimws(lines[brace_idx - 1]), " {"), lines[-(1:brace_idx)])
+    writeLines(lines, file)
+}

@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main 
+  workflow_dispatch: 
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+    env: 
+      CREATE_RELEASE: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main 
+
+      - name: Extract metadata (Version & Changelog)
+        id: metadata
+        run: |
+          python3 -c "
+          import re, os
+          with open('metadata.txt', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # Extract version
+          v_match = re.search(r'^version\s*=\s*(.*)', content, re.MULTILINE)
+          version = v_match.group(1).strip() if v_match else 'unknown'
+          
+          # Extract changelog
+          c_match = re.search(r'^changelog\s*=\s*(.*?)(?:^[a-zA-Z0-9_]+\s*=|\Z)', content, re.MULTILINE | re.DOTALL)
+          changelog = c_match.group(1).strip() if c_match else 'No changelog provided.'
+          
+          # Saving version and changelog in a text file
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'PLUGIN_VERSION={version}\n')
+          with open('changelog.txt', 'w', encoding='utf-8') as cl:
+              cl.write(changelog)
+          "
+
+      - name: Check if release exists
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${PLUGIN_VERSION}" &>/dev/null; then
+            echo "Release v${PLUGIN_VERSION} already exists. Skipping release creation."
+            echo "CREATE_RELEASE=false" >> $GITHUB_ENV
+          else
+            echo "Release v${PLUGIN_VERSION} is new! Proceeding."
+            echo "CREATE_RELEASE=true" >> $GITHUB_ENV
+          fi
+
+      - name: Update README.md version and Commit
+        run: |
+          # Replacing new version on README
+          sed -i "s|badge/Version-[^-]*-blue\.svg|badge/Version-${PLUGIN_VERSION}-blue.svg|g" README.md
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add README.md
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "docs: update README version to ${PLUGIN_VERSION} [skip ci]"
+            git push
+          fi
+
+      - name: Create Plugin ZIP
+        if: env.CREATE_RELEASE == 'true'
+        run: |
+          git archive --prefix=r_console/ -o r_console.zip HEAD
+          zip -d r_console.zip "r_console/.github/*" "r_console/.gitignore" "r_console/README.md" || true
+
+      - name: Create GitHub Release
+        if: env.CREATE_RELEASE == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v${PLUGIN_VERSION}"
+          
+          # Crear el release usando la CLI de GitHub
+          gh release create "$TAG_NAME" r_console.zip \
+            --title "r_console $PLUGIN_VERSION" \
+            --notes-file changelog.txt \
+            --target HEAD
