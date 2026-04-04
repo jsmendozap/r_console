@@ -10,13 +10,17 @@ An R console integrated into QGIS. Write and execute R code directly inside QGIS
 > [!WARNING] 
 > This project is currently in an early stage of development. While the core functionalities are already implemented and fully functional, there are still several features and improvements pending (please refer to the [Roadmap](#roadmap) below).
 
-## Features
-
 ![Demo](resources/demo.gif)
 
-- Interactive R console with command history
+## Features
+
+- Interactive R console with command history, plot history, and a graphics panel
 - Multi-tab script editor with R syntax highlighting and autocompletion
 - UI controls to restart the R session, clear the console, and change the working directory
+- Keyboard shortcuts
+	•	Ctrl / Cmd + Enter: execute current line or selection
+	•	Ctrl / Cmd + S: save active script
+	•	Ctrl / Cmd + L (console): clear console
 - Bidirectional interoperability between R and QGIS:
   - Read project metadata (title, path, CRS, map units)
   - Load vector and raster layers from QGIS into R as `sf` or `SpatRaster` objects
