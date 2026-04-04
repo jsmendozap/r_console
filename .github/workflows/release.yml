@@ -83,8 +83,7 @@ jobs:
         run: |
           TAG_NAME="v${PLUGIN_VERSION}"
           
-          # Crear el release usando la CLI de GitHub
           gh release create "$TAG_NAME" r_console.zip \
             --title "r_console $PLUGIN_VERSION" \
             --notes-file changelog.txt \
-            --target HEAD
+            --target main

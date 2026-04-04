@@ -39,6 +39,7 @@ class RConsole(QTextEdit):
             else:
                 self.setTextColor(QColor("#1D1DC3"))
                 self.append(self.prompt + line)
+            self._reset_hscroll()
 
             if "\n" not in line:
                 self.history_list.append(line)
@@ -46,23 +47,28 @@ class RConsole(QTextEdit):
 
         if result.error is not None:
             self.append(f"<span style='color:#c0392b;'>Error: {html.escape(result.error)}</span>")
+            self._reset_hscroll()
 
         if result.stdout:
             self.append(f"<pre style='margin:0;'>{html.escape(result.stdout)}</pre>")
+            self._reset_hscroll()
 
     def append_raw(self, text):
         if text:
             self.append(f"<pre style='margin:0;'>{html.escape(text)}</pre>")
+            self._reset_hscroll()
 
     def clean(self, prompt):
         self.clear()
         if prompt:
             self.insertPlainText(self.prompt)
+        self._reset_hscroll()
 
     def new_line(self):
         self.setTextColor(QColor("#1D1DC3"))
         self.append(self.prompt)
         self.moveCursor(QTextCursor.End)
+        self._reset_hscroll()
 
     @property
     def width_cols(self):
@@ -170,6 +176,7 @@ class RConsole(QTextEdit):
         cursor.removeSelectedText()
         cursor.insertText(self.prompt + text)
         self.setTextCursor(cursor)
+        self._reset_hscroll()
 
     def _clamp_selection(self):
         cursor = self.textCursor()
@@ -188,3 +195,8 @@ class RConsole(QTextEdit):
             cursor.setPosition(prompt_end, QTextCursor.KeepAnchor)
             self.setTextCursor(cursor)
             self.blockSignals(False)
+
+    def _reset_hscroll(self):
+        bar = self.horizontalScrollBar()
+        if bar is not None:
+            bar.setValue(0)
