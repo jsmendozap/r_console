@@ -34,6 +34,9 @@ class _QStyleCompat:
 class _QFrameCompat:
     NoFrame = scoped(_QFrame, "Shape", "NoFrame") or _QFrame.NoFrame
 
+    def __call__(self, *args, **kwargs):
+        return _QFrame(*args, **kwargs)
+
     def __getattr__(self, name):
         return getattr(_QFrame, name)
 
@@ -43,6 +46,9 @@ class _QDialogButtonBoxCompat:
     Cancel = scoped(_QDialogButtonBox, "StandardButton", "Cancel") or _QDialogButtonBox.Cancel
     Close = scoped(_QDialogButtonBox, "StandardButton", "Close") or _QDialogButtonBox.Close
     Save = scoped(_QDialogButtonBox, "StandardButton", "Save") or _QDialogButtonBox.Save
+
+    def __call__(self, *args, **kwargs):
+        return _QDialogButtonBox(*args, **kwargs)
 
     def __getattr__(self, name):
         return getattr(_QDialogButtonBox, name)
@@ -68,6 +74,9 @@ class _QTabBarCompat:
 
 class _QGraphicsViewCompat:
     ScrollHandDrag = scoped(_QGraphicsView, "DragMode", "ScrollHandDrag") or _QGraphicsView.ScrollHandDrag
+
+    def __call__(self, *args, **kwargs):
+        return _QGraphicsView(*args, **kwargs)
 
     def __getattr__(self, name):
         return getattr(_QGraphicsView, name)

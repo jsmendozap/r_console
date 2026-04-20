@@ -1,11 +1,11 @@
 from qgis.PyQt.QtWidgets import QWidget, QVBoxLayout, QGraphicsScene, QListWidget, QListWidgetItem, QMenu, QApplication
 from qgis.PyQt.QtNetwork import QNetworkAccessManager, QNetworkRequest
-from qgis.PyQt.QtWebSockets import QWebSocket
 from qgis.PyQt.QtGui import QIcon, QPixmap
 from qgis.PyQt.QtCore import QSize, QUrl, QTimer, pyqtSignal
 
 from ..qt.core import Qt
 from ..qt.widgets import QGraphicsView, QListView
+from ..qt.websockets import QWebSocket
 
 class PlotPanel(QWidget):
     plotAdded = pyqtSignal()

@@ -9,12 +9,18 @@ class _QTextCursorCompat:
     StartOfBlock = scoped(_QTextCursor, "MoveOperation", "StartOfBlock") or _QTextCursor.StartOfBlock
     KeepAnchor = scoped(_QTextCursor, "MoveMode", "KeepAnchor") or _QTextCursor.KeepAnchor
 
+    def __call__(self, *args, **kwargs):
+        return _QTextCursor(*args, **kwargs)
+
     def __getattr__(self, name):
         return getattr(_QTextCursor, name)
 
 
 class _QFontCompat:
     TypeWriter = scoped(_QFont, "StyleHint", "TypeWriter") or _QFont.TypeWriter
+
+    def __call__(self, *args, **kwargs):
+        return _QFont(*args, **kwargs)
 
     def __getattr__(self, name):
         return getattr(_QFont, name)
