@@ -1,13 +1,13 @@
 """QtGui compatibility shims that preserve PyQt5-style enum names on Qt6."""
 
 from qgis.PyQt.QtGui import QFont as _QFont, QTextCursor as _QTextCursor
-from .utils import scoped
+from .utils import resolve_enum
 
 
 class _QTextCursorCompat:
-    End = scoped(_QTextCursor, "MoveOperation", "End") or _QTextCursor.End
-    StartOfBlock = scoped(_QTextCursor, "MoveOperation", "StartOfBlock") or _QTextCursor.StartOfBlock
-    KeepAnchor = scoped(_QTextCursor, "MoveMode", "KeepAnchor") or _QTextCursor.KeepAnchor
+    End = resolve_enum(_QTextCursor, "MoveOperation", "End")
+    StartOfBlock = resolve_enum(_QTextCursor, "MoveOperation", "StartOfBlock")
+    KeepAnchor = resolve_enum(_QTextCursor, "MoveMode", "KeepAnchor")
 
     def __call__(self, *args, **kwargs):
         return _QTextCursor(*args, **kwargs)
@@ -17,7 +17,8 @@ class _QTextCursorCompat:
 
 
 class _QFontCompat:
-    TypeWriter = scoped(_QFont, "StyleHint", "TypeWriter") or _QFont.TypeWriter
+    TypeWriter = resolve_enum(_QFont, "StyleHint", "TypeWriter")
+    Monospace = resolve_enum(_QFont, "StyleHint", "Monospace")
 
     def __call__(self, *args, **kwargs):
         return _QFont(*args, **kwargs)

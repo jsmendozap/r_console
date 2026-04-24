@@ -111,7 +111,7 @@ class RDockSettings(QDialog):
             return
             
         dialog = LogViewerDialog(log_file, self)
-        dialog.exec_()
+        dialog.exec()
 
     def _toggle_panel_title(self, checked):
         plugin_settings.set_show_panel_title(checked)            

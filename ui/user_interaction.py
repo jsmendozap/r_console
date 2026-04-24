@@ -1,11 +1,9 @@
 from qgis.PyQt.QtWidgets import (
     QInputDialog, QFileDialog, QDialog,
-    QVBoxLayout, QTableView, QHeaderView,
-    QTreeView
+    QVBoxLayout, QTableView, QTreeView
 )
-from qgis.PyQt.QtWidgets import QAbstractItemView
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
-from ..qt.widgets import QDialogButtonBox, QMessageBox
+from ..qt.widgets import QDialogButtonBox, QMessageBox, QHeaderView, QAbstractItemView
 
 import os
 import csv
@@ -90,7 +88,7 @@ class QuestionDialog:
         if not self.args.get("remove_on_close", False):
             layout.addWidget(buttons)
         
-        dialog.exec_()
+        dialog.exec()
         self._remove_file(file_path, self.args.get("remove_on_close", False))
         return {"type": "response", "data": True}
 
@@ -120,7 +118,7 @@ class QuestionDialog:
                             
         layout.addWidget(table)
         
-        dialog.exec_()
+        dialog.exec()
         self._remove_file(file_path, self.args.get("remove_on_close", False))
         return {"type": "response", "data": True}
 
@@ -193,7 +191,7 @@ class QuestionDialog:
             tree.setExpanded(model.index(0, 0), True)
         layout.addWidget(tree)
 
-        dialog.exec_()
+        dialog.exec()
         self._remove_file(file_path, self.args.get("remove_on_close", False))
         return {"type": "response", "data": True}
 

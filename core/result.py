@@ -18,7 +18,7 @@ class RResult:
             case "pkg":         return PkgResult(msg)
             case "help":        return HelpResult(msg)
             case "plot_server": return PlotServerResult(msg)
-            case "missing":     raise MissingDependencyError(msg["data"])
+            case "missing":     raise MissingDependencyError(f"The following R packages are missing: {msg['data']}")
 
 
 class ChunkResult(RResult):

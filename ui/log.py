@@ -1,5 +1,7 @@
-from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QTextEdit
-from qgis.PyQt.QtGui import QFont
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout
+from ..qt.gui import QFont
+from ..qt.widgets import QTextEdit
+
 import json
 import html
 

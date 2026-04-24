@@ -109,5 +109,5 @@ class PlotPanel(QWidget):
         
         action = menu.addAction("Copy to clipboard")
         action.triggered.connect(lambda: QApplication.clipboard().setPixmap(self._plots[row]))
-        menu.exec_(self.view.mapToGlobal(pos))
+        menu.exec(self.view.mapToGlobal(pos))
         

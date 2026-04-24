@@ -2,19 +2,19 @@
 
 from qgis.PyQt.Qsci import QsciScintilla as _QsciScintilla, QsciAPIs
 
-from .utils import scoped
+from .utils import resolve_enum
 
 
 class _QsciScintillaCompat:
-    AcsAPIs = scoped(_QsciScintilla, "AutoCompletionSource", "AcsAPIs") or _QsciScintilla.AcsAPIs
-    AcsNone = scoped(_QsciScintilla, "AutoCompletionSource", "AcsNone") or _QsciScintilla.AcsNone
+    AcsAPIs = resolve_enum(_QsciScintilla, "AutoCompletionSource", "AcsAPIs")
+    AcsNone = resolve_enum(_QsciScintilla, "AutoCompletionSource", "AcsNone")
     AcusNever = (
-        scoped(_QsciScintilla, "AutoCompletionUseSingle", "AcusNever") or _QsciScintilla.AcusNever
+        resolve_enum(_QsciScintilla, "AutoCompletionUseSingle", "AcusNever")
     )
     CallTipsAboveText = (
-        scoped(_QsciScintilla, "CallTipsPosition", "CallTipsAboveText") or _QsciScintilla.CallTipsAboveText
+        resolve_enum(_QsciScintilla, "CallTipsPosition", "CallTipsAboveText")
     )
-    NoFoldStyle = scoped(_QsciScintilla, "FoldStyle", "NoFoldStyle") or _QsciScintilla.NoFoldStyle
+    NoFoldStyle = resolve_enum(_QsciScintilla, "FoldStyle", "NoFoldStyle")
 
     def __getattr__(self, name):
         return getattr(_QsciScintilla, name)

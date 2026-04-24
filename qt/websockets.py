@@ -1,9 +1,7 @@
 """QtWebSockets compatibility imports."""
+from qgis.PyQt.QtCore import QT_VERSION_STR
 
-try:
-    from qgis.PyQt.QtWebSockets import QWebSocket
-except ModuleNotFoundError:
-    try:
-        from PyQt5.QtWebSockets import QWebSocket
-    except ModuleNotFoundError:
-        from PyQt6.QtWebSockets import QWebSocket
+if QT_VERSION_STR.startswith("5."):
+    from PyQt5.QtWebSockets import QWebSocket
+elif QT_VERSION_STR.startswith("6."):
+    from PyQt6.QtWebSockets import QWebSocket

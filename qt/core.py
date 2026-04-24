@@ -1,28 +1,28 @@
 """QtCore compatibility shims that preserve PyQt5-style enum names on Qt6."""
 
 from qgis.PyQt.QtCore import Qt as _Qt
-from .utils import scoped
+from .utils import resolve_enum
 
 
 class _QtCompat:
     BlockingQueuedConnection = (
-        scoped(_Qt, "ConnectionType", "BlockingQueuedConnection") or _Qt.BlockingQueuedConnection
+        resolve_enum(_Qt, "ConnectionType", "BlockingQueuedConnection")
     )
-    RightDockWidgetArea = scoped(_Qt, "DockWidgetArea", "RightDockWidgetArea") or _Qt.RightDockWidgetArea
-    TopRightCorner = scoped(_Qt, "Corner", "TopRightCorner") or _Qt.TopRightCorner
-    Vertical = scoped(_Qt, "Orientation", "Vertical") or _Qt.Vertical
-    NoModifier = scoped(_Qt, "KeyboardModifier", "NoModifier") or _Qt.NoModifier
-    Key_Return = scoped(_Qt, "Key", "Key_Return") or _Qt.Key_Return
-    Key_Enter = scoped(_Qt, "Key", "Key_Enter") or _Qt.Key_Enter
-    Key_Backspace = scoped(_Qt, "Key", "Key_Backspace") or _Qt.Key_Backspace
-    Key_Delete = scoped(_Qt, "Key", "Key_Delete") or _Qt.Key_Delete
-    Key_Left = scoped(_Qt, "Key", "Key_Left") or _Qt.Key_Left
-    Key_Up = scoped(_Qt, "Key", "Key_Up") or _Qt.Key_Up
-    Key_Down = scoped(_Qt, "Key", "Key_Down") or _Qt.Key_Down
-    CustomContextMenu = scoped(_Qt, "ContextMenuPolicy", "CustomContextMenu") or _Qt.CustomContextMenu
-    KeepAspectRatio = scoped(_Qt, "AspectRatioMode", "KeepAspectRatio") or _Qt.KeepAspectRatio
+    RightDockWidgetArea = resolve_enum(_Qt, "DockWidgetArea", "RightDockWidgetArea")
+    TopRightCorner = resolve_enum(_Qt, "Corner", "TopRightCorner")
+    Vertical = resolve_enum(_Qt, "Orientation", "Vertical")
+    NoModifier = resolve_enum(_Qt, "KeyboardModifier", "NoModifier")
+    Key_Return = resolve_enum(_Qt, "Key", "Key_Return")
+    Key_Enter = resolve_enum(_Qt, "Key", "Key_Enter")
+    Key_Backspace = resolve_enum(_Qt, "Key", "Key_Backspace")
+    Key_Delete = resolve_enum(_Qt, "Key", "Key_Delete")
+    Key_Left = resolve_enum(_Qt, "Key", "Key_Left")
+    Key_Up = resolve_enum(_Qt, "Key", "Key_Up")
+    Key_Down = resolve_enum(_Qt, "Key", "Key_Down")
+    CustomContextMenu = resolve_enum(_Qt, "ContextMenuPolicy", "CustomContextMenu")
+    KeepAspectRatio = resolve_enum(_Qt, "AspectRatioMode", "KeepAspectRatio")
     SmoothTransformation = (
-        scoped(_Qt, "TransformationMode", "SmoothTransformation") or _Qt.SmoothTransformation
+        resolve_enum(_Qt, "TransformationMode", "SmoothTransformation")
     )
 
     def __getattr__(self, name):
