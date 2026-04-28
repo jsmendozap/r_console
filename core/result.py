@@ -24,6 +24,7 @@ class RResult:
             case "pkg":         return PkgResult(msg)
             case "help":        return HelpResult(msg)
             case "plot_server": return PlotServerResult(msg)
+            case "notify":      return NotifyResult(msg)
             case "missing":     raise MissingDependencyError(f"The following R packages are missing: {msg['data']}")
 
 
@@ -71,3 +72,9 @@ class PlotServerResult(RResult):
     def __init__(self, msg):
         self.port = msg["data"]["port"]
         self.token = msg["data"]["token"]
+
+
+class NotifyResult(RResult):
+    def __init__(self, msg):
+        self.message = msg.get("message", "")
+    

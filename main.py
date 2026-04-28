@@ -250,6 +250,10 @@ class Console:
         """Slot to change the working directory in the R session."""
         if self.runner:
             self.runner.change_wd(path)
+            
+    def _on_notify(self, message):
+        """Shows a non-blocking notification to the user."""
+        self.iface.messageBar().pushMessage("R Console", message, Qgis.Warning)
 
     def _on_project_changed(self, *args):
         """
@@ -302,6 +306,7 @@ class Console:
         self.runner.pkg_loaded.connect(self.dock.on_pkg_loaded)
         self.runner.help_requested.connect(self.dock.show_help_dialog)
         self.runner.plot_server.connect(lambda data: self.dock.connect_plot_server(data))
+        self.runner.notify.connect(self._on_notify)
 
     def _disconnect_project_updates(self):
         """Disconnects from all QGIS project signals."""

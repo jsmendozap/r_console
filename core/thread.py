@@ -13,6 +13,7 @@ class BridgeCallbacks:
     on_pkg_loaded: Callable
     on_help_requested: Callable
     on_plot_server_ready: Callable
+    on_notify: Callable
 
 class RWorker(QObject):
     """
@@ -31,6 +32,7 @@ class RWorker(QObject):
     pkg_loaded = pyqtSignal(list)
     help_requested = pyqtSignal(str)
     plot_server = pyqtSignal(tuple)
+    notify = pyqtSignal(str)
 
     def __init__(self, qgis_api):
         """
@@ -53,7 +55,8 @@ class RWorker(QObject):
             callbacks = BridgeCallbacks(
                 on_pkg_loaded=self._on_pkg_loaded,
                 on_help_requested=self._on_help_requested,
-                on_plot_server_ready=self._on_plot_server_ready
+                on_plot_server_ready=self._on_plot_server_ready,
+                on_notify=self._on_notify
             )
             self.bridge = RBridge(self.qgis_api, callbacks)
             self.bridge.initialize()
@@ -178,6 +181,15 @@ class RWorker(QObject):
             token (str): A token for authenticating with the plot server.
         """
         self.plot_server.emit((port, token))
+        
+    def _on_notify(self, message):
+        """
+        Callback for general notifications from R.
+        
+        Args:
+            message (str): The notification text.
+        """
+        self.notify.emit(message)
 
 
 class RRunner(QObject):
@@ -203,6 +215,7 @@ class RRunner(QObject):
     pkg_loaded = pyqtSignal(list)
     help_requested = pyqtSignal(str)
     plot_server = pyqtSignal(tuple)
+    notify = pyqtSignal(str)
 
     def __init__(self, qgis_api):
         """
@@ -282,6 +295,7 @@ class RRunner(QObject):
         self._worker.pkg_loaded.connect(self.pkg_loaded)
         self._worker.help_requested.connect(self.help_requested)
         self._worker.plot_server.connect(self.plot_server)
+        self._worker.notify.connect(self.notify)
 
     def _connect_request_signals(self):
         """Connects this object's request signals to the worker's slots."""

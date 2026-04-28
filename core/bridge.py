@@ -1,5 +1,5 @@
 from qgis.PyQt.QtCore import QMetaObject, Q_ARG
-from .result import RResult, RequestResult, PkgResult, HelpResult, PlotServerResult, DoneResult, ChunkResult
+from .result import RResult, RequestResult, PkgResult, HelpResult, PlotServerResult, DoneResult, ChunkResult, NotifyResult
 from .utils import RPathRequiredError, root_dir
 from .logger import SessionLogger
 from . import plugin_settings
@@ -97,6 +97,10 @@ class RBridge:
 
             if isinstance(result, PlotServerResult):
                 self.callbacks.on_plot_server_ready(result.port, result.token)
+                continue
+
+            if isinstance(result, NotifyResult):
+                self.callbacks.on_notify(result.message)
                 continue
 
             yield result

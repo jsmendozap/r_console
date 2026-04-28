@@ -18,17 +18,18 @@ local({
         suppressMessages(tools::startDynamicHelp())
 
         source(file.path(.plugin_dir, "core", "r", "protocol.R"), local = TRUE)
-
-        tryCatch({
+    
+        if ("png" %in% unigd::ugd_renderers()$id) {
             httpgd::hgd(width = 380, height = 250, silent = TRUE)
             par(mar = c(4, 4, 2, 1))
             details <- httpgd::hgd_details()
             send_message("plot_server", list(
                 port = details$port,
                 token = details$token
-            ))
-        }, error = function(e) send_done(error = conditionMessage(e))
-        )
+            ))   
+        } else {
+            send_notify("Plots disabled: PNG renderer was not found.")
+        }
     }
 })
 

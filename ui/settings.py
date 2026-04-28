@@ -45,8 +45,25 @@ class RDockSettings(QDialog):
         self.initial_wd.setStorageMode(QgsFileWidget.GetDirectory)
 
         self.panel_title = QCheckBox()
+        groupbox_style = """
+            QGroupBox { 
+                font-weight: bold; 
+                border: 1px solid #ccc; 
+                border-radius: 4px; 
+                margin-top: 8px;
+                padding-top: 10px;
+                margin-bottom: 10px;
+            } 
 
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }                                           
+            """
+        
         general_group = QGroupBox("General")
+        general_group.setStyleSheet(groupbox_style)
         general_layout = QFormLayout(general_group)
         general_layout.setContentsMargins(10, 10, 10, 10)
         general_layout.addRow("Working directory on startup:", self.initial_wd)
@@ -62,6 +79,7 @@ class RDockSettings(QDialog):
 
         self.debug_group = QGroupBox("Session Logging")
         self.debug_group.setCheckable(True)
+        self.debug_group.setStyleSheet(groupbox_style)
         self.debug_group.setChecked(False)
         debug_layout = QFormLayout(self.debug_group)
         debug_layout.setContentsMargins(10, 10, 10, 10)
