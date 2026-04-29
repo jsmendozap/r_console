@@ -27,6 +27,7 @@ An R console integrated into QGIS. Write and execute R code directly inside QGIS
   - Insert R spatial objects back into the QGIS project
   - Load selected features from the active layer
 - Automatic project state synchronization when layers or project properties change
+- Interactive map tools to draw geometries (points, rectangles) directly from R
 - Get selected features from the active layer
 - Configurable R path and initial working directory
 
@@ -41,7 +42,7 @@ An R console integrated into QGIS. Write and execute R code directly inside QGIS
 
 ## Requirements
 
-- QGIS 3.30 or later (QGIS 4 is not yet supported)
+- QGIS 3.30 or later
 - R 4.1.0 or later 
 - R packages: `R6`, `jsonlite`, `evaluate`, `httpgd`, `sf`, `terra`
 
@@ -167,6 +168,18 @@ qgis$get_canvas_extent()
 ```r
 # returns selected features from the active layer as an sf object
 qgis$get_selected_features()
+```
+
+#### Interactive Map Tools
+
+Prompt the user to draw geometries on the QGIS map canvas and receive the coordinates instantly in R:
+
+```r
+# Draw a rectangle and get its bounding box (sf bbox)
+my_bbox <- qgis_draw_rectangle()
+
+# Draw a specific number of points (sf sfc)
+my_points <- qgis_draw_points(n = 3)
 ```
 
 ## License

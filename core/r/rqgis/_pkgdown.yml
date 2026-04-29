@@ -1,0 +1,8 @@
+url: https://jsmendozap.github.io/rqgis
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    base_font: {google: "Roboto"}
+    font-size-base: 0.95rem
