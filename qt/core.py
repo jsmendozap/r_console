@@ -19,6 +19,7 @@ class _QtCompat:
     Key_Left = resolve_enum(_Qt, "Key", "Key_Left")
     Key_Up = resolve_enum(_Qt, "Key", "Key_Up")
     Key_Down = resolve_enum(_Qt, "Key", "Key_Down")
+    LeftButton = resolve_enum(_Qt, "MouseButton", "LeftButton")
     CustomContextMenu = resolve_enum(_Qt, "ContextMenuPolicy", "CustomContextMenu")
     KeepAspectRatio = resolve_enum(_Qt, "AspectRatioMode", "KeepAspectRatio")
     SmoothTransformation = (

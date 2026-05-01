@@ -1,4 +1,5 @@
 from qgis.PyQt.QtCore import QSettings
+from shutil import which
 import os
 
 _settings = QSettings("r_console", "RConsole")
@@ -11,7 +12,11 @@ KEY_SHOW_PANEL_TITLE = "show_panel_title"
 
 
 def get_r_path():
-    return _settings.value(KEY_R_PATH, "", type=str)
+    saved = _settings.value(KEY_R_PATH, "", type=str)
+    if saved:
+        return saved
+    path = which("Rscript")
+    return path if path else ""
 
 def set_r_path(path):
     _settings.setValue(KEY_R_PATH, path)

@@ -6,7 +6,6 @@ from .utils import RPathRequiredError, root_dir
 from .logger import SessionLogger
 from . import plugin_settings
 from ..qt.core import Qt
-from shutil import which
 import subprocess
 import json
 import os
@@ -119,10 +118,11 @@ class RBridge:
         Returns:
             RResult: A result object containing the welcome message.
         """
+        lib = os.path.join(self.plugin_dir, "lib").replace('\\', '/')
         code = "\n".join([
         'cat(R.version.string, "\\n")',
         'cat("Running on", format(utils::osVersion), "\\n")',
-        'library(rqgis)',
+        f'library(rqgis, lib.loc="{lib}")',
         ])
 
         stdout = ""
@@ -185,7 +185,7 @@ class RBridge:
         if "rscript" not in base:
             args.extend(["--slave", "-f", f"{worker}", "--args", f"{self.plugin_dir}", f"{qgis_process}"])
         else:
-            args.extend([f"{worker}", f"{self.plugin_dir}"])
+            args.extend([f"{worker}", f"{self.plugin_dir}", f"{qgis_process}"])
         
         creationflags = 0
         if os.name == 'nt':
@@ -246,14 +246,10 @@ class RBridge:
         Returns:
             str: The absolute path to the Rscript executable.
         """
-        saved = plugin_settings.get_r_path()
-        if saved:
-            return saved
-        
-        path = which('Rscript')
+        path = plugin_settings.get_r_path()
         if path:
             return path
-        
+            
         raise RPathRequiredError("R/Rscript not found.")
 
     def _set_wd(self):
@@ -275,4 +271,5 @@ class RBridge:
             qgis_process = os.path.join(os.path.dirname(qgis_path), "qgis_process.exe")
         else:
             qgis_process = os.path.join(os.path.dirname(qgis_path), "qgis_process")
+            
         return qgis_process

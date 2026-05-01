@@ -1,6 +1,5 @@
 .lib <- file.path(.plugin_dir, "lib")
 dir.create(.lib, showWarnings = FALSE)
-.libPaths(c(.lib, .libPaths()))
 
 options(rqgis.qgis_process = .qgis_process)
 

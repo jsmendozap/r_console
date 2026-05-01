@@ -1,10 +1,11 @@
-from qgis.PyQt.QtCore import QObject, pyqtSlot, QEventLoop, Qt
+from qgis.PyQt.QtCore import QObject, pyqtSlot, QEventLoop
 from qgis.gui import QgsMapToolExtent, QgsMapToolEmitPoint
 from qgis.core import (
     QgsProject, QgsUnitTypes, QgsMapLayer, QgsRasterLayer,
     QgsVectorLayer, QgsWkbTypes, QgsProcessingFeatureSourceDefinition
 )
 from ..ui.user_interaction import QuestionDialog
+from ..qt.core import Qt
 import processing
 import uuid
 import tempfile
