@@ -36,8 +36,8 @@ An R console integrated into QGIS. Write and execute R code directly inside QGIS
 - [x] Support for `plot` command
 - [x] Support for `View` command
 - [x] Enable functions that require user interaction (e.g. `file.choose`, `menu`, ...)
+- [x] Compatibility with QGIS 4
 - [ ] Pseudo-terminal (PTY) emulation for full interactive support
-- [ ] Compatibility with QGIS 4
 - [ ] Language Server Protocol (LSP) implementation for advanced editor features
 
 ## Requirements
