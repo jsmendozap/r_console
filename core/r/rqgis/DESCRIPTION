@@ -8,7 +8,8 @@ Imports:
     R6,
     sf,
     terra
-URL: https://jsmendozap.github.io/rqgis
+URL: https://jsmendozap.github.io/rqgis, https://github.com/jsmendozap/rqgis
+BugReports: https://github.com/jsmendozap/rqgis/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

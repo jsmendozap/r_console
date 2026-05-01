@@ -33,6 +33,26 @@ jobs:
       - name: Install R packages
         run: install.packages(c("pkgdown", "R6", "sf", "terra"))
         shell: Rscript {0}
+        
+      - name: Generate NEWS.md from metadata.txt
+        run: |
+          python3 -c "
+          import re
+          with open('metadata.txt', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          v_match = re.search(r'^version\s*=\s*(.*)', content, re.MULTILINE)
+          version = v_match.group(1).strip() if v_match else 'unknown'
+          
+          c_match = re.search(r'^changelog\s*=\s*(.*?)(?:^[a-zA-Z0-9_]+\s*=|\Z)', content, re.MULTILINE | re.DOTALL)
+          changelog = c_match.group(1).strip() if c_match else 'No release notes.'
+          if changelog.startswith(version):
+              changelog = changelog[len(version):].strip()
+              
+          news_content = f'# rqgis {version}\n\n{changelog}\n'
+          with open('core/r/rqgis/NEWS.md', 'w', encoding='utf-8') as f:
+              f.write(news_content)
+          "
 
       - name: Build site
         run: pkgdown::build_site(pkg = "core/r/rqgis")
